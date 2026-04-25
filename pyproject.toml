@@ -1,0 +1,45 @@
+
+[tool.poetry]
+name = "fastgram-outreach"
+version = "0.1.0"
+description = "Instagram Outreach MVP"
+authors = ["PyDevDeep"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "~3.13.0"
+fastapi = "^0.110.0"
+uvicorn = "^0.29.0"
+instagrapi = "^2.1.1"
+gspread = "^6.1.0"
+google-auth = "^2.29.0"
+pydantic-settings = "^2.2.1"
+python-dotenv = "^1.0.1"
+httpx = "^0.27.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+pytest-asyncio = "^0.23.6"
+ruff = ">=0.9.0"
+pyright = ">=1.1.400"
+pre-commit = "^3.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+exclude = [".venv", "__pycache__", "logs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "S", "W", "N", "UP", "C4", "SIM", "RUF", "A", "DTZ", "TID", "ASYNC", "PT"]
+ignore = ["F401", "E501", "B008", "RUF001", "RUF002", "RUF003", "N815", "S107"]
+
+[tool.pyright]
+include = ["app"]
+exclude = ["**/node_modules", "**/.*", "**/__pycache__", "build", "dist", "venv", ".venv",]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
