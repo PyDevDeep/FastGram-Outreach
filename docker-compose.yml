@@ -1,0 +1,40 @@
+services:
+  api:
+    build: .
+    container_name: fastgram_api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8003:8000"
+    volumes:
+      - ./app:/app/app
+      - ./logs:/app/logs
+      - ./sessions:/app/sessions
+    env_file:
+      - .env
+    networks:
+      - fastgram_network
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: fastgram_n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5679:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5679/
+      - GENERIC_TIMEZONE=Europe/Kyiv
+    volumes:
+      - fastgram_n8n_data:/home/node/.n8n
+    networks:
+      - fastgram_network
+
+networks:
+  fastgram_network:
+    driver: bridge
+
+volumes:
+  fastgram_n8n_data:
