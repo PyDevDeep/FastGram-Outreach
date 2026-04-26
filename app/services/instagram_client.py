@@ -28,8 +28,8 @@ class InstagramClient:
     async def check_session_valid(self) -> bool:
         """Легкий запит для перевірки валідності поточної сесії."""
         try:
-            # Використовуємо to_thread для уникнення блокування event loop
-            await asyncio.to_thread(self.client.account_info)
+            # get_timeline_feed - оптимальний запит без аргументів для перевірки auth статусу
+            await asyncio.to_thread(self.client.get_timeline_feed)  # type: ignore[reportUnknownArgumentType]
             return True
         except Exception as e:
             logger.warning(f"Session validation failed: {e}")
