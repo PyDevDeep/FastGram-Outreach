@@ -9,23 +9,21 @@ from app.services.sheets_client import GoogleSheetsClient
 
 async def test_sheets():
     print("🔍 [SHEETS] Перевірка доступу до таблиці...")
-    try:
-        client = GoogleSheetsClient()
-        pending = await client.get_pending_contacts()
 
-        print("✅ [SHEETS] Підключення успішне!")
-        print(f"📋 [SHEETS] Знайдено контактів у статусі 'Pending': {len(pending)}")
+    # Виконуємо ініціалізацію та запит без перехоплення помилок
+    client = GoogleSheetsClient()
+    pending = await client.get_pending_contacts()
 
-        if pending:
-            first = pending[0]
-            print(
-                f"👤 [SHEETS] Тестовий лід: {first.get('Instagram Username')} (Рядок: {first.get('_row_index')})"
-            )
-        else:
-            print("⚠️ [SHEETS] У таблиці немає рядків зі статусом 'Pending'. Додай один для тесту.")
+    print("✅ [SHEETS] Підключення успішне!")
+    print(f"📋 [SHEETS] Знайдено контактів у статусі 'Pending': {len(pending)}")
 
-    except Exception as e:
-        print(f"❌ [SHEETS] Помилка: {e}")
+    if pending:
+        first = pending[0]
+        print(
+            f"👤 [SHEETS] Тестовий лід: {first.get('Instagram Username')} (Рядок: {first.get('_row_index')})"
+        )
+    else:
+        print("⚠️ [SHEETS] У таблиці немає рядків зі статусом 'Pending'. Додай один для тесту.")
 
 
 if __name__ == "__main__":

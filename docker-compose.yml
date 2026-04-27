@@ -10,6 +10,7 @@ services:
       - ./logs:/app/logs
       - ./sessions:/app/sessions
       - ./scripts:/app/scripts
+      - ./credentials.json:/app/credentials.json:ro
     env_file:
       - .env
     networks:

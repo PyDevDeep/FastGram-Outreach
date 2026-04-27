@@ -6,9 +6,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+import requests.exceptions
 from cryptography.fernet import Fernet, InvalidToken
 from instagrapi import Client  # type: ignore[reportMissingTypeStubs]
 from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
+    BadPassword,
     ChallengeRequired,
     LoginRequired,
 )
@@ -22,7 +24,10 @@ logger = setup_logger("instagram_client")
 
 
 class NoFallbackProxyAdapter(HTTPAdapter):
-    """Транспортний адаптер що забороняє будь-який fallback при помилці проксі."""
+    """Забороняє fallback на локальний IP, але дозволяє retry на SSL помилки."""
+
+    # Кількість retry для нестабільних мобільних проксі
+    MAX_SSL_RETRIES = 3
 
     def send(
         self,
@@ -33,17 +38,37 @@ class NoFallbackProxyAdapter(HTTPAdapter):
         cert: Any = None,
         proxies: Mapping[str, str] | None = None,
     ) -> Response:
-        try:
-            return super().send(
-                request,
-                stream=stream,
-                timeout=timeout,
-                verify=verify,
-                cert=cert,
-                proxies=proxies,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Proxy connection failed mid-request: {e}") from e
+        last_error: Exception | None = None
+
+        for attempt in range(1, self.MAX_SSL_RETRIES + 1):
+            try:
+                return super().send(
+                    request,
+                    stream=stream,
+                    timeout=timeout,
+                    verify=verify,
+                    cert=cert,
+                    proxies=proxies,
+                )
+            except requests.exceptions.SSLError as e:
+                last_error = e
+                logger.warning(f"SSL error on attempt {attempt}/{self.MAX_SSL_RETRIES}: {e}")
+                if attempt == self.MAX_SSL_RETRIES:
+                    # Всі retry вичерпані — проксі реально недоступний
+                    raise RuntimeError(
+                        f"Proxy SSL failed after {self.MAX_SSL_RETRIES} attempts: {e}"
+                    ) from e
+                # Невелика пауза між retry (синхронна — ми в requests контексті)
+                import time
+
+                time.sleep(1.0 * attempt)  # 1s, 2s між спробами
+
+            except Exception as e:
+                # Не SSL помилка — одразу блокуємо без retry
+                raise RuntimeError(f"Proxy connection failed mid-request: {e}") from e
+
+        # Unreachable але потрібно для type checker
+        raise RuntimeError(f"Proxy SSL failed: {last_error}")
 
 
 class InstagramClient:
@@ -341,8 +366,17 @@ class InstagramClient:
         except LoginRequired as e:
             logger.error(f"Login failed (credentials rejected): {e}")
             return False
+        except BadPassword as e:
+            error_text = str(e).lower()
+            if "facebook" in error_text or "blacklist" in error_text or "ip" in error_text:
+                logger.error(
+                    f"IP заблокований Instagram. "
+                    f"Зміни session ID у PROXY_URL для отримання нового IP: {e}"
+                )
+            else:
+                logger.error(f"Невірний пароль Instagram: {e}")
+            return False
         except Exception as e:
             logger.error(f"Unexpected login error: {e}")
             return False
-
         return False
