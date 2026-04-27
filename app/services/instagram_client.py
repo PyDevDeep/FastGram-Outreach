@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import json
+import secrets
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -50,10 +51,13 @@ class InstagramClient:
         self.settings = get_settings()
         self.client = Client()
         self.session_path = Path(self.settings.session_file_path)
-        self.client.delay_range = [2, 5]
-
+        self.client.delay_range = [5, 15]
         # Fail-Fast: валідація ключа при старті, не при першому використанні
         self._validate_encryption_key()
+        # Локаль має відповідати географії проксі
+        # Ukrainian proxy → uk-UA, Italian proxy → it-IT
+        self.client.set_locale(self.settings.instagram_locale)  # наприклад "uk_UA"
+        self.client.set_timezone_offset(self.settings.timezone_offset)  # наприклад 10800 для UTC+3
 
         # Proxy monitor state
         self._proxy_alive = asyncio.Event()
@@ -70,7 +74,7 @@ class InstagramClient:
             self.client.private.mount("http://", adapter)
             self.client.private.mount("https://", adapter)
             # Додати після верифікації імені:
-            self.client.public.mount("http://", adapter)  # або інша назва
+            self.client.public.mount("http://", adapter)
             self.client.public.mount("https://", adapter)
             logger.info(f"Proxy configured with no-fallback adapter: {self.settings.proxy_url}")
         else:
@@ -81,8 +85,7 @@ class InstagramClient:
     # ------------------------------------------------------------------ #
 
     def _get_fernet(self) -> Fernet:
-        key_str = str(getattr(self.settings, "session_encryption_key", ""))
-        return Fernet(key_str.encode())
+        return Fernet(self.settings.session_encryption_key.encode())
 
     def _validate_encryption_key(self) -> None:
         """Перевіряє що ключ шифрування валідний Fernet ключ.
@@ -130,6 +133,63 @@ class InstagramClient:
             logger.critical("Proxy unreachable. Blocking login to prevent IP leak.")
         return result
 
+    # [DEV ONLY] — ЗАКОМЕНТУВАТИ ПЕРЕД PRODUCTION ------------------------------------
+    async def run_proxy_leak_check(self) -> None:
+        """Діагностика: exit IP, leak headers, DNS resolver."""
+        if not self.settings.proxy_url:
+            logger.warning("[PROXY CHECK] No proxy set — skipping")
+            return
+
+        logger.info("[PROXY CHECK] Starting diagnostic...")
+
+        try:
+            # 1. Перевірка вихідного IP
+            try:
+                ip_resp = await asyncio.to_thread(
+                    self.client.private.get,
+                    "https://api.ipify.org?format=json",
+                    timeout=10,
+                )
+                logger.info(f"[PROXY CHECK] Exit IP: {ip_resp.json().get('ip')}")
+            except Exception as e:
+                logger.error(f"[PROXY CHECK] IP check failed: {e}")
+
+            # 2. Перевірка на витік заголовків
+            try:
+                headers_resp = await asyncio.to_thread(
+                    self.client.private.get,
+                    "https://httpbin.org/get",
+                    timeout=10,
+                )
+                data = headers_resp.json()
+                leak_headers = {
+                    k: v
+                    for k, v in data.get("headers", {}).items()
+                    if k in ("X-Forwarded-For", "Via", "X-Real-Ip", "Forwarded")
+                }
+                if leak_headers:
+                    logger.warning(f"[PROXY CHECK] Leak headers found: {leak_headers}")
+                else:
+                    logger.info("[PROXY CHECK] Headers clean — Elite proxy confirmed")
+            except Exception as e:
+                logger.error(f"[PROXY CHECK] Headers check failed: {e}")
+
+            # 3. Перевірка DNS
+            try:
+                dns_resp = await asyncio.to_thread(
+                    self.client.private.get,
+                    "https://edns.ip-api.com/json",
+                    timeout=10,
+                )
+                dns = dns_resp.json().get("dns", {})
+                logger.info(f"[PROXY CHECK] DNS resolver: {dns.get('ip')} ({dns.get('geo')})")
+            except Exception as e:
+                logger.error(f"[PROXY CHECK] DNS check failed: {e}")
+
+        except Exception as global_e:
+            logger.critical(f"[PROXY CHECK] Unexpected error in diagnostic: {global_e}")
+
+    # [DEV ONLY END] -------------------------------------------------------------
     async def _proxy_monitor_loop(self) -> None:
         if not self.settings.proxy_url:
             return
@@ -233,7 +293,10 @@ class InstagramClient:
     async def login(self) -> bool:
         if not await self._verify_proxy():
             return False
-
+        # [DEV ONLY] — ЗАКОМЕНТУВАТИ ПЕРЕД PRODUCTION --------------------------------
+        if self.settings.debug:
+            await self.run_proxy_leak_check()
+        # ------------------------------------------------------------------------
         if self.session_path.exists():
             try:
                 logger.info(f"Loading session from {self.session_path}")
@@ -242,9 +305,15 @@ class InstagramClient:
                 if await self.check_session_valid():
                     logger.info("Session restored and validated successfully")
                     self.start_proxy_monitor()
+
+                    delay = 1.5 + secrets.randbelow(2501) / 1000.0  # 1.500 – 4.000
+                    logger.info(f"Post-restore human delay: {delay:.1f}s")
+                    await asyncio.sleep(delay)
+
                     return True
             except Exception as e:
                 logger.error(f"Failed to load or validate session: {e}")
+                await asyncio.sleep(2.0 + secrets.randbelow(3001) / 1000.0)
 
         try:
             logger.info("Attempting fresh login...")
@@ -258,6 +327,12 @@ class InstagramClient:
                 await self._save_session_encrypted()
                 logger.info("Login successful, session saved")
                 self.start_proxy_monitor()
+
+                # Людська пауза після логіну перед першою дією
+                delay = 3.0 + secrets.randbelow(5001) / 1000.0  # 3.000 – 8.000
+                logger.info(f"Post-login human delay: {delay:.1f}s")
+                await asyncio.sleep(delay)
+
                 return True
 
         except ChallengeRequired as e:
