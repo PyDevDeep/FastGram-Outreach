@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     proxy_check_timeout: int = Field(default=10)
     proxy_max_failures: int = Field(default=2)
 
+    google_sheets_id: str = ""
+    google_application_credentials: str = "/app/credentials.json"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
