@@ -16,7 +16,7 @@ gspread = "^6.1.0"
 google-auth = "^2.29.0"
 pydantic-settings = "^2.2.1"
 python-dotenv = "^1.0.1"
-httpx = "^0.27.0"
+cryptography = "^47.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"
