@@ -9,6 +9,7 @@ services:
       - ./app:/app/app
       - ./logs:/app/logs
       - ./sessions:/app/sessions
+      - ./scripts:/app/scripts
     env_file:
       - .env
     networks:
