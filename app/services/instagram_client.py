@@ -254,7 +254,6 @@ class InstagramClient:
         if self._monitor_task:
             self._monitor_task.cancel()
 
-            # Виправлено SIM105 (Ruff)
             with contextlib.suppress(asyncio.CancelledError):
                 await self._monitor_task
 
@@ -379,4 +378,25 @@ class InstagramClient:
         except Exception as e:
             logger.error(f"Unexpected login error: {e}")
             return False
+
         return False
+
+    async def send_direct_message(self, user_id: str, message_text: str) -> bool:
+        """Відправка DM. Прокидає помилки авторизації наверх для обробки в Engine."""
+        await self._assert_proxy_alive()
+
+        try:
+            logger.info(f"Sending DM to user_id: {user_id}")
+            result = await asyncio.to_thread(
+                self.client.direct_send,  # type: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+                message_text,
+                user_ids=[int(user_id)],
+            )
+            return bool(result)
+        except ChallengeRequired:
+            raise
+        except LoginRequired:
+            raise
+        except Exception as e:
+            logger.error(f"Error sending DM to {user_id}: {e}")
+            return False
