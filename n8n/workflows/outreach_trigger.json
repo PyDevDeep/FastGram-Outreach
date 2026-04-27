@@ -13,10 +13,10 @@
         }
       },
       "id": "1",
-      "name": "Schedule Trigger (10:00 AM)",
+      "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
-      "position": [250, 300]
+      "position": [0, 300]
     },
     {
       "parameters": {
@@ -33,13 +33,16 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\"dry_run\": false}"
+        "jsonBody": "{\"dry_run\": false}",
+        "options": {
+          "ignoreResponseCode": true
+        }
       },
       "id": "2",
       "name": "FastAPI: Start Outreach",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [450, 300]
+      "position": [200, 300]
     },
     {
       "parameters": {
@@ -53,24 +56,43 @@
         }
       },
       "id": "3",
-      "name": "Check Status",
+      "name": "Check Success",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [650, 300]
+      "position": [400, 300]
     },
     {
       "parameters": {
-        "content": "Alert: Outreach failed to start or is blocked.\nCheck FastAPI logs."
+        "workflowId": "REPLACE_WITH_ALERT_WORKFLOW_ID",
+        "mode": "passThrough",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "values": {
+            "workflow_name": "Outreach Daily Trigger",
+            "error_message": "={{ $json.detail || 'Unknown error starting batch' }}"
+          }
+        }
       },
       "id": "4",
-      "name": "Error Alert (Stub)",
+      "name": "Execute Error Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [650, 450]
+    },
+    {
+      "parameters": {
+        "content": "={{ 'Успішно запущено батч на ' + $json.batch_size + ' контактів. Task ID: ' + $json.task_id }}"
+      },
+      "id": "5",
+      "name": "Log Success",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [850, 400]
+      "position": [650, 150]
     }
   ],
   "connections": {
-    "Schedule Trigger (10:00 AM)": {
+    "Schedule Trigger": {
       "main": [
         [
           {
@@ -85,19 +107,25 @@
       "main": [
         [
           {
-            "node": "Check Status",
+            "node": "Check Success",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Status": {
+    "Check Success": {
       "main": [
-        [],
         [
           {
-            "node": "Error Alert (Stub)",
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Error Workflow",
             "type": "main",
             "index": 0
           }
