@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,12 @@ class Settings(BaseSettings):
     min_delay_seconds: int = 60
     max_delay_seconds: int = 300
     polling_interval_minutes: int = 30
+    session_encryption_key: str = ""
+
+    # Налаштування моніторингу проксі
+    proxy_check_interval: int = Field(default=60)
+    proxy_check_timeout: int = Field(default=10)
+    proxy_max_failures: int = Field(default=2)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
