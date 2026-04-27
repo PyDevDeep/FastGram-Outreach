@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,13 +10,14 @@ class Settings(BaseSettings):
     instagram_username: str = ""
     instagram_password: str = ""
     proxy_url: str = ""
-    session_file_path: str = "/app/sessions/session.json"
+    session_file_path: str = str(Path("sessions") / "session.json")
     daily_message_limit: int = 20
     min_delay_seconds: int = 60
     max_delay_seconds: int = 300
     polling_interval_minutes: int = 30
     session_encryption_key: str = ""
-
+    instagram_locale: str = "uk_UA"
+    timezone_offset: int = 10800  # секунди від UTC, UTC+3 = 3*3600
     # Налаштування моніторингу проксі
     proxy_check_interval: int = Field(default=60)
     proxy_check_timeout: int = Field(default=10)
@@ -23,6 +25,7 @@ class Settings(BaseSettings):
 
     google_sheets_id: str = ""
     google_application_credentials: str = "/app/credentials.json"
+    debug: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
