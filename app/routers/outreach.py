@@ -91,9 +91,7 @@ async def increment_warmup(manager: WarmupManager = Depends(get_warmup_manager))
         }
 
     new_limit = manager.increment_warmup_day()
-
-    # Використовуємо ._state безпечно тільки для читання
-    current_day = manager._state.get("day", 1)
+    current_day = manager.get_current_day()
 
     return {
         "status": "incremented",
@@ -114,7 +112,7 @@ async def reset_warmup(manager: WarmupManager = Depends(get_warmup_manager)) -> 
 async def get_warmup_status(manager: WarmupManager = Depends(get_warmup_manager)) -> dict[str, Any]:
     """Отримання поточного статусу прогріву."""
     return {
-        "day": manager._state.get("day", 1),
+        "day": manager.get_current_day(),
         "daily_limit": manager.get_current_daily_limit(),
         "is_active": manager.is_warmup_active(),
     }

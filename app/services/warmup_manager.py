@@ -52,6 +52,10 @@ class WarmupManager:
                 logger.info("Warm-up режим завершено. Ліміт встановлено на 50 повідомлень.")
             return 50
 
+    def get_current_day(self) -> int:
+        """Повертає поточний день прогріву."""
+        return self._state.get("day", 1)
+
     def get_current_daily_limit(self) -> int:
         """Повертає поточний денний ліміт."""
         return self._state.get("daily_limit", 5)
