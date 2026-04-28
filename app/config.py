@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     google_application_credentials: str = "/app/credentials.json"
     debug: bool = False
 
+    # n8n Webhooks
+    n8n_webhook_url: str | None = Field(default=None)
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

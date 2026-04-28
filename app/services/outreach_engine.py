@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
     ChallengeRequired,
     LoginRequired,
@@ -57,6 +58,26 @@ class OutreachEngine:
 
     async def generate_delay(self, min_sec: int, max_sec: int) -> float:
         return await random_delay(min_sec, max_sec)
+
+    async def _send_block_alert(self, reason: str, sent_count: int, username: str) -> None:
+        """Відправляє Push-сповіщення у n8n про блокування акаунта."""
+        webhook_url = self.settings.n8n_webhook_url
+        if not webhook_url:
+            logger.warning("N8N_WEBHOOK_URL не налаштовано. Алерт про блокування проігноровано.")
+            return
+
+        payload = {
+            "reason": reason,
+            "sent_count": sent_count,
+            "timestamp": datetime.now(UTC).date().isoformat(),
+            "username": username,
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(webhook_url, json=payload, timeout=5.0)
+                logger.info("Alert sent to n8n webhook successfully.")
+        except Exception as e:
+            logger.error(f"Failed to send block alert to n8n: {e}")
 
     async def run_batch(
         self, batch_size: int | None = None, dry_run: bool = False
@@ -163,6 +184,7 @@ class OutreachEngine:
                 self.state = "blocked"
                 await self.sheets_client.update_contact_status(int(row_index), "Failed", timestamp)
                 failed_count += 1
+                await self._send_block_alert("ChallengeRequired", sent_count, str(username))
                 break
 
             except LoginRequired as e:
@@ -182,6 +204,9 @@ class OutreachEngine:
                         int(row_index), "Failed", timestamp
                     )
                     failed_count += 1
+                    await self._send_block_alert(
+                        "LoginRequired (Re-login failed)", sent_count, str(username)
+                    )
                     break
 
             except Exception as e:
