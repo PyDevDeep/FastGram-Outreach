@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.routers import health, outreach
+from app.routers import health, outreach, tracking
 from app.utils.logger import setup_logger
 
 logger = setup_logger("fastgram_api")
@@ -20,6 +20,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(outreach.router)  # Підключено новий роутер
+    app.include_router(tracking.router)  # Підключено роутер відстеження
 
     return app
 
