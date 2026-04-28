@@ -5,8 +5,14 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.dependencies import get_outreach_engine, get_warmup_manager, verify_api_key
+from app.dependencies import (
+    get_outreach_engine,
+    get_pause_manager,
+    get_warmup_manager,
+    verify_api_key,
+)
 from app.services.outreach_engine import OutreachEngine
+from app.services.pause_manager import PauseManager
 from app.services.warmup_manager import WarmupManager
 
 router = APIRouter(prefix="/outreach", tags=["Outreach"], dependencies=[Depends(verify_api_key)])
@@ -116,3 +122,18 @@ async def get_warmup_status(manager: WarmupManager = Depends(get_warmup_manager)
         "daily_limit": manager.get_current_daily_limit(),
         "is_active": manager.is_warmup_active(),
     }
+
+
+@router.post("/resume-pause")
+async def manual_resume_pause(manager: PauseManager = Depends(get_pause_manager)) -> dict[str, str]:
+    """Примусове зняття 24-годинної паузи (використовувати після ручного розблокування акаунта)."""
+    if not manager.is_paused():
+        return {"status": "ignored", "message": "System is not currently paused."}
+
+    manager.manual_resume()
+    # Якщо engine був у стані 'blocked', переводимо його в 'idle' для можливості нових запусків
+    engine = get_outreach_engine()
+    if engine.state == "blocked":
+        engine.state = "idle"
+
+    return {"status": "resumed", "message": "Pause lifted manually. System ready."}

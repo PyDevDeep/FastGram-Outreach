@@ -10,6 +10,7 @@ from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
 
 from app.config import get_settings
 from app.services.instagram_client import InstagramClient
+from app.services.pause_manager import PauseManager
 from app.services.proxy_rotator import ProxyRotator
 from app.services.sheets_client import GoogleSheetsClient
 from app.services.warmup_manager import WarmupManager
@@ -26,11 +27,13 @@ class OutreachEngine:
         sheets_client: GoogleSheetsClient,
         warmup_manager: WarmupManager,
         proxy_rotator: ProxyRotator,
+        pause_manager: PauseManager,
     ) -> None:
         self.instagram_client = instagram_client
         self.sheets_client = sheets_client
         self.warmup_manager = warmup_manager
         self.proxy_rotator = proxy_rotator
+        self.pause_manager = pause_manager
         self.settings = get_settings()
         self._state = "idle"
         self.sent_today = 0
@@ -86,6 +89,21 @@ class OutreachEngine:
         if self.state != "idle":
             logger.warning(f"Cannot start new batch. Engine is currently in '{self.state}' state.")
             return {"sent": 0, "failed": 0, "remaining": 0, "state": self.state}
+
+        # --- ДОДАНО: Перевірка 24-годинної паузи ---
+        if self.pause_manager.is_paused():
+            rem_time = self.pause_manager.get_remaining_pause_time()
+            logger.warning(
+                f"Cannot start batch. System is paused for {rem_time} due to previous block."
+            )
+            return {
+                "sent": 0,
+                "failed": 0,
+                "remaining": 0,
+                "state": "paused",
+                "message": f"Paused. Resume in {rem_time}",
+            }
+        # ------------------------------------------
 
         self.state = "running"
         # 1. PROXY ROTATION CHECK
@@ -182,6 +200,7 @@ class OutreachEngine:
             except ChallengeRequired as e:
                 logger.critical(f"Challenge Required triggered by {username}: {e}")
                 self.state = "blocked"
+                self.pause_manager.trigger_pause("ChallengeRequired")
                 await self.sheets_client.update_contact_status(int(row_index), "Failed", timestamp)
                 failed_count += 1
                 await self._send_block_alert("ChallengeRequired", sent_count, str(username))
@@ -200,6 +219,7 @@ class OutreachEngine:
                 else:
                     logger.critical("Re-login failed. Blocking engine.")
                     self.state = "blocked"
+                    self.pause_manager.trigger_pause("LoginRequired")
                     await self.sheets_client.update_contact_status(
                         int(row_index), "Failed", timestamp
                     )
