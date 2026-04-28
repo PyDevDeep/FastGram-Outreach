@@ -1,0 +1,77 @@
+{
+  "name": "Warmup Daily Increment",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "1 0 * * *"
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Cron (00:01 UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastgram_api:8000/outreach/warmup/increment",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "your_secure_api_key_here"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2",
+      "name": "FastAPI: Increment Warmup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "content": "={{ 'Warm-up status: ' + $json.status + '. Day: ' + $json.day + ', Limit: ' + $json.new_limit }}"
+      },
+      "id": "3",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [600, 300]
+    }
+  ],
+  "connections": {
+    "Cron (00:01 UTC)": {
+      "main": [
+        [
+          {
+            "node": "FastAPI: Increment Warmup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FastAPI: Increment Warmup": {
+      "main": [
+        [
+          {
+            "node": "Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
