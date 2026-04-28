@@ -48,7 +48,7 @@ class OutreachEngine:
 
     @state.setter
     def state(self, value: str) -> None:
-        valid_states = ["idle", "running", "paused", "blocked"]
+        valid_states = ["idle", "running", "paused", "blocked", "stopping"]
         if value in valid_states:
             logger.info(f"Engine state changed: {self._state} -> {value}")
             self._state = value
@@ -135,10 +135,9 @@ class OutreachEngine:
         for contact in pending_contacts:
             await self._resume_event.wait()
 
-            if self.state == "blocked":  # type: ignore[reportUnnecessaryComparison]
-                logger.warning("Engine is BLOCKED. Halting batch processing.")
+            if self.state in ("blocked", "stopping"):  # type: ignore[reportUnnecessaryContains]
+                logger.warning(f"Engine is {self.state.upper()}. Halting batch processing.")
                 break
-
             # 2. Перевірка зміни доби та лімітів
             today = datetime.now(UTC).date()
             if today > self._current_date:
