@@ -1,0 +1,125 @@
+{
+  "name": "Reply Polling & Lead Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/30 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Cron (Every 30m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://fastgram_api:8000/tracking/check-replies",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "your_secure_api_key_here"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2",
+      "name": "FastAPI: Check Replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.interested }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "Interested > 0?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '🔥 Знайдено нових зацікавлених лідів (' + $json.interested + ')!\n\nОброблено: ' + $json.processed + '\nВідмов: ' + $json.not_interested + '\nНерозпізнано: ' + $json.unclear + '\n\nВідкрий Google Sheets для перегляду тегів.' }}",
+        "additionalFields": {}
+      },
+      "id": "4",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [850, 150]
+    },
+    {
+      "parameters": {
+        "content": "No interested leads. Skip notification."
+      },
+      "id": "5",
+      "name": "Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [850, 450]
+    }
+  ],
+  "connections": {
+    "Cron (Every 30m)": {
+      "main": [
+        [
+          {
+            "node": "FastAPI: Check Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FastAPI: Check Replies": {
+      "main": [
+        [
+          {
+            "node": "Interested > 0?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interested > 0?": {
+      "main": [
+        [
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
