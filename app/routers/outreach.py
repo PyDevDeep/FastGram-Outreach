@@ -5,8 +5,9 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.dependencies import get_outreach_engine, verify_api_key
+from app.dependencies import get_outreach_engine, get_warmup_manager, verify_api_key
 from app.services.outreach_engine import OutreachEngine
+from app.services.warmup_manager import WarmupManager
 
 router = APIRouter(prefix="/outreach", tags=["Outreach"], dependencies=[Depends(verify_api_key)])
 
@@ -71,4 +72,49 @@ async def get_outreach_status(
         "pending_in_sheets": len(pending),
         "failed_today": getattr(engine, "failed_today", 0),
         "last_message_time": getattr(engine, "last_message_time", None),
+    }
+
+
+# ------------------------------------------------------------------ #
+#  Warm-up Management                                                #
+# ------------------------------------------------------------------ #
+
+
+@router.post("/warmup/increment")
+async def increment_warmup(manager: WarmupManager = Depends(get_warmup_manager)) -> dict[str, Any]:
+    """Перехід на наступний день прогріву (викликається через n8n щодня о 00:01)."""
+    if not manager.is_warmup_active():
+        return {
+            "status": "completed",
+            "message": "Warm-up already finished.",
+            "current_limit": manager.get_current_daily_limit(),
+        }
+
+    new_limit = manager.increment_warmup_day()
+
+    # Використовуємо ._state безпечно тільки для читання
+    current_day = manager._state.get("day", 1)
+
+    return {
+        "status": "incremented",
+        "day": current_day,
+        "new_limit": new_limit,
+        "is_active": manager.is_warmup_active(),
+    }
+
+
+@router.post("/warmup/reset")
+async def reset_warmup(manager: WarmupManager = Depends(get_warmup_manager)) -> dict[str, str]:
+    """Примусове скидання прогріву до 1-го дня (використовувати при бані або зміні акаунта)."""
+    manager.reset_warmup()
+    return {"status": "reset", "message": "Warm-up reset to Day 1 (Limit: 5)"}
+
+
+@router.get("/warmup/status")
+async def get_warmup_status(manager: WarmupManager = Depends(get_warmup_manager)) -> dict[str, Any]:
+    """Отримання поточного статусу прогріву."""
+    return {
+        "day": manager._state.get("day", 1),
+        "daily_limit": manager.get_current_daily_limit(),
+        "is_active": manager.is_warmup_active(),
     }
