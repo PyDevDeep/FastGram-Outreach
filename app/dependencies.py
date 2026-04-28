@@ -4,6 +4,7 @@ from fastapi.security.api_key import APIKeyHeader
 from app.config import get_settings
 from app.services.instagram_client import InstagramClient
 from app.services.outreach_engine import OutreachEngine
+from app.services.proxy_rotator import ProxyRotator
 from app.services.reply_tracker import ReplyTracker
 from app.services.sheets_client import GoogleSheetsClient
 from app.services.warmup_manager import WarmupManager
@@ -15,7 +16,10 @@ settings = get_settings()
 _instagram_client = InstagramClient()
 _sheets_client = GoogleSheetsClient()
 _warmup_manager = WarmupManager()
-_outreach_engine = OutreachEngine(_instagram_client, _sheets_client, warmup_manager=_warmup_manager)
+_proxy_rotator = ProxyRotator()
+_outreach_engine = OutreachEngine(
+    _instagram_client, _sheets_client, warmup_manager=_warmup_manager, proxy_rotator=_proxy_rotator
+)
 _reply_tracker = ReplyTracker(_instagram_client, _sheets_client)
 
 

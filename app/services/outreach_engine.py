@@ -9,6 +9,7 @@ from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
 
 from app.config import get_settings
 from app.services.instagram_client import InstagramClient
+from app.services.proxy_rotator import ProxyRotator
 from app.services.sheets_client import GoogleSheetsClient
 from app.services.warmup_manager import WarmupManager
 from app.utils.delay import random_delay, typing_simulation_delay
@@ -23,10 +24,12 @@ class OutreachEngine:
         instagram_client: InstagramClient,
         sheets_client: GoogleSheetsClient,
         warmup_manager: WarmupManager,
+        proxy_rotator: ProxyRotator,
     ) -> None:
         self.instagram_client = instagram_client
         self.sheets_client = sheets_client
         self.warmup_manager = warmup_manager
+        self.proxy_rotator = proxy_rotator
         self.settings = get_settings()
         self._state = "idle"
         self.sent_today = 0
@@ -64,6 +67,24 @@ class OutreachEngine:
             return {"sent": 0, "failed": 0, "remaining": 0, "state": self.state}
 
         self.state = "running"
+        # 1. PROXY ROTATION CHECK
+        if not dry_run and self.proxy_rotator.is_rotation_needed():
+            logger.info("Initiating proxy rotation before batch...")
+            new_proxy = await self.proxy_rotator.request_new_ip()
+
+            if new_proxy:
+                old_proxy = getattr(self.instagram_client, "proxy", "default/unknown")
+                success = await self.proxy_rotator.update_instagram_session_proxy(
+                    self.instagram_client, new_proxy
+                )
+                if success:
+                    logger.info(f"Proxy IP rotated: {old_proxy} -> {new_proxy}")
+                else:
+                    logger.warning("Proxy validation failed. Continuing with previous IP.")
+            else:
+                logger.warning(
+                    "Failed to obtain new Proxy IP from provider. Continuing with current IP."
+                )
         limit = batch_size or self.settings.daily_message_limit
 
         pending_contacts = await self.sheets_client.get_pending_contacts()
@@ -130,6 +151,7 @@ class OutreachEngine:
                     )
                     sent_count += 1
                     self.sent_today += 1
+                    self.proxy_rotator.increment_message_count()
                 else:
                     await self.sheets_client.update_contact_status(
                         int(row_index), "Failed", timestamp
