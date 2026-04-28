@@ -10,6 +10,7 @@ from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
 from app.config import get_settings
 from app.services.instagram_client import InstagramClient
 from app.services.sheets_client import GoogleSheetsClient
+from app.services.warmup_manager import WarmupManager
 from app.utils.delay import random_delay, typing_simulation_delay
 from app.utils.logger import setup_logger
 
@@ -21,9 +22,11 @@ class OutreachEngine:
         self,
         instagram_client: InstagramClient,
         sheets_client: GoogleSheetsClient,
+        warmup_manager: WarmupManager,
     ) -> None:
         self.instagram_client = instagram_client
         self.sheets_client = sheets_client
+        self.warmup_manager = warmup_manager
         self.settings = get_settings()
         self._state = "idle"
         self.sent_today = 0
@@ -56,8 +59,8 @@ class OutreachEngine:
         self, batch_size: int | None = None, dry_run: bool = False
     ) -> dict[str, Any]:
         """Обробка черги повідомлень із затримками, лімітами та обробкою помилок."""
-        if self.state in ["running", "blocked"]:
-            logger.warning(f"Cannot start batch. Current state: {self.state}")
+        if self.state != "idle":
+            logger.warning(f"Cannot start new batch. Engine is currently in '{self.state}' state.")
             return {"sent": 0, "failed": 0, "remaining": 0, "state": self.state}
 
         self.state = "running"
