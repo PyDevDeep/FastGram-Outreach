@@ -1,8 +1,14 @@
+"""
+File: app/services/instagram_client.py
+Task: 4.1.1 - Retry logic & Instagrapi Wrapper
+"""
+
 import asyncio
 import contextlib
 import json
 import secrets
-from collections.abc import Mapping
+from collections.abc import Callable, Coroutine, Mapping
+from functools import wraps
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,7 +18,9 @@ from instagrapi import Client  # type: ignore[reportMissingTypeStubs]
 from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
     BadPassword,
     ChallengeRequired,
+    ClientConnectionError,
     LoginRequired,
+    RateLimitError,
 )
 from requests.adapters import HTTPAdapter
 from requests.models import PreparedRequest, Response
@@ -23,10 +31,53 @@ from app.utils.logger import setup_logger
 logger = setup_logger("instagram_client")
 
 
+def with_api_retry[T](
+    func: Callable[..., Coroutine[Any, Any, T]],
+) -> Callable[..., Coroutine[Any, Any, T]]:
+    """Декоратор для автоматичного retry Instagram API запитів."""
+
+    @wraps(func)
+    async def wrapper(*args: Any, **kwargs: Any) -> T:
+        max_retries = 3
+        backoff_delays = [5.0, 15.0, 45.0]
+
+        for attempt in range(max_retries + 1):
+            try:
+                return await func(*args, **kwargs)
+            except (ChallengeRequired, LoginRequired):
+                # Критичні помилки авторизації — fail fast
+                raise
+            except RateLimitError as e:
+                if attempt == max_retries:
+                    logger.error(
+                        f"[Retry {attempt}/{max_retries}] Rate Limit exhausted in {func.__name__}"
+                    )
+                    raise
+                logger.warning(
+                    f"Rate Limit in {func.__name__}: {e}. Waiting 60s... (Attempt {attempt + 1}/{max_retries})"
+                )
+                await asyncio.sleep(60.0)
+            except (ClientConnectionError, requests.exceptions.RequestException, TimeoutError) as e:
+                if attempt == max_retries:
+                    logger.error(
+                        f"[Retry {attempt}/{max_retries}] Network error exhausted in {func.__name__}"
+                    )
+                    raise
+                delay = backoff_delays[attempt]
+                logger.warning(
+                    f"Network error in {func.__name__}: {e}. Waiting {delay}s... (Attempt {attempt + 1}/{max_retries})"
+                )
+                await asyncio.sleep(delay)
+
+        # Гарантуємо Pylance, що функція не поверне None
+        raise RuntimeError(f"Retry loop exhausted without returning or raising in {func.__name__}")
+
+    return wrapper
+
+
 class NoFallbackProxyAdapter(HTTPAdapter):
     """Забороняє fallback на локальний IP, але дозволяє retry на SSL помилки."""
 
-    # Кількість retry для нестабільних мобільних проксі
     MAX_SSL_RETRIES = 3
 
     def send(
@@ -54,20 +105,17 @@ class NoFallbackProxyAdapter(HTTPAdapter):
                 last_error = e
                 logger.warning(f"SSL error on attempt {attempt}/{self.MAX_SSL_RETRIES}: {e}")
                 if attempt == self.MAX_SSL_RETRIES:
-                    # Всі retry вичерпані — проксі реально недоступний
                     raise RuntimeError(
                         f"Proxy SSL failed after {self.MAX_SSL_RETRIES} attempts: {e}"
                     ) from e
-                # Невелика пауза між retry (синхронна — ми в requests контексті)
+
                 import time
 
-                time.sleep(1.0 * attempt)  # 1s, 2s між спробами
+                time.sleep(1.0 * attempt)
 
             except Exception as e:
-                # Не SSL помилка — одразу блокуємо без retry
                 raise RuntimeError(f"Proxy connection failed mid-request: {e}") from e
 
-        # Unreachable але потрібно для type checker
         raise RuntimeError(f"Proxy SSL failed: {last_error}")
 
 
@@ -77,64 +125,37 @@ class InstagramClient:
         self.client = Client()
         self.session_path = Path(self.settings.session_file_path)
         self.client.delay_range = [5, 15]
-        # Fail-Fast: валідація ключа при старті, не при першому використанні
-        self._validate_encryption_key()
-        # Локаль має відповідати географії проксі
-        # Ukrainian proxy → uk-UA, Italian proxy → it-IT
-        self.client.set_locale(self.settings.instagram_locale)  # наприклад "uk_UA"
-        self.client.set_timezone_offset(self.settings.timezone_offset)  # наприклад 10800 для UTC+3
 
-        # Proxy monitor state
+        self._validate_encryption_key()
+        self.client.set_locale(self.settings.instagram_locale)
+        self.client.set_timezone_offset(self.settings.timezone_offset)
+
         self._proxy_alive = asyncio.Event()
         self._proxy_alive.set()
-
-        # Додано явний тип Task[Any]
         self._monitor_task: asyncio.Task[Any] | None = None
 
         if self.settings.proxy_url:
             self.client.set_proxy(self.settings.proxy_url)
-
-            # Забороняємо requests робити fallback на локальний IP при падінні проксі
             adapter = NoFallbackProxyAdapter()
             self.client.private.mount("http://", adapter)
             self.client.private.mount("https://", adapter)
-            # Додати після верифікації імені:
             self.client.public.mount("http://", adapter)
             self.client.public.mount("https://", adapter)
             logger.info(f"Proxy configured with no-fallback adapter: {self.settings.proxy_url}")
         else:
             logger.warning("No proxy configured. High risk of account ban.")
 
-    # ------------------------------------------------------------------ #
-    #  Internal helpers                                                    #
-    # ------------------------------------------------------------------ #
-
     def _get_fernet(self) -> Fernet:
         return Fernet(self.settings.session_encryption_key.encode())
 
     def _validate_encryption_key(self) -> None:
-        """Перевіряє що ключ шифрування валідний Fernet ключ.
-
-        Fernet вимагає URL-safe base64 рядок довжиною 32 байти (44 символи в base64).
-        Краще впасти при старті з чітким повідомленням ніж при збереженні сесії.
-        """
         key = self.settings.session_encryption_key
         if not key:
-            raise ValueError(
-                "SESSION_ENCRYPTION_KEY is not set. "
-                'Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
-            )
+            raise ValueError("SESSION_ENCRYPTION_KEY is not set.")
         try:
             Fernet(key.encode())
         except Exception as e:
-            raise ValueError(
-                f"SESSION_ENCRYPTION_KEY is invalid: {e}. "
-                'Generate a valid key with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
-            ) from e
-
-    # ------------------------------------------------------------------ #
-    #  Proxy                                                               #
-    # ------------------------------------------------------------------ #
+            raise ValueError(f"SESSION_ENCRYPTION_KEY is invalid: {e}.") from e
 
     def _check_proxy(self) -> bool:
         if not self.settings.proxy_url:
@@ -158,63 +179,6 @@ class InstagramClient:
             logger.critical("Proxy unreachable. Blocking login to prevent IP leak.")
         return result
 
-    # [DEV ONLY] — ЗАКОМЕНТУВАТИ ПЕРЕД PRODUCTION ------------------------------------
-    async def run_proxy_leak_check(self) -> None:
-        """Діагностика: exit IP, leak headers, DNS resolver."""
-        if not self.settings.proxy_url:
-            logger.warning("[PROXY CHECK] No proxy set — skipping")
-            return
-
-        logger.info("[PROXY CHECK] Starting diagnostic...")
-
-        try:
-            # 1. Перевірка вихідного IP
-            try:
-                ip_resp = await asyncio.to_thread(
-                    self.client.private.get,
-                    "https://api.ipify.org?format=json",
-                    timeout=10,
-                )
-                logger.info(f"[PROXY CHECK] Exit IP: {ip_resp.json().get('ip')}")
-            except Exception as e:
-                logger.error(f"[PROXY CHECK] IP check failed: {e}")
-
-            # 2. Перевірка на витік заголовків
-            try:
-                headers_resp = await asyncio.to_thread(
-                    self.client.private.get,
-                    "https://httpbin.org/get",
-                    timeout=10,
-                )
-                data = headers_resp.json()
-                leak_headers = {
-                    k: v
-                    for k, v in data.get("headers", {}).items()
-                    if k in ("X-Forwarded-For", "Via", "X-Real-Ip", "Forwarded")
-                }
-                if leak_headers:
-                    logger.warning(f"[PROXY CHECK] Leak headers found: {leak_headers}")
-                else:
-                    logger.info("[PROXY CHECK] Headers clean — Elite proxy confirmed")
-            except Exception as e:
-                logger.error(f"[PROXY CHECK] Headers check failed: {e}")
-
-            # 3. Перевірка DNS
-            try:
-                dns_resp = await asyncio.to_thread(
-                    self.client.private.get,
-                    "https://edns.ip-api.com/json",
-                    timeout=10,
-                )
-                dns = dns_resp.json().get("dns", {})
-                logger.info(f"[PROXY CHECK] DNS resolver: {dns.get('ip')} ({dns.get('geo')})")
-            except Exception as e:
-                logger.error(f"[PROXY CHECK] DNS check failed: {e}")
-
-        except Exception as global_e:
-            logger.critical(f"[PROXY CHECK] Unexpected error in diagnostic: {global_e}")
-
-    # [DEV ONLY END] -------------------------------------------------------------
     async def _proxy_monitor_loop(self) -> None:
         if not self.settings.proxy_url:
             return
@@ -224,7 +188,6 @@ class InstagramClient:
 
         while True:
             await asyncio.sleep(self.settings.proxy_check_interval)
-
             alive = await asyncio.to_thread(self._check_proxy)
 
             if alive:
@@ -253,10 +216,8 @@ class InstagramClient:
     async def stop_proxy_monitor(self) -> None:
         if self._monitor_task:
             self._monitor_task.cancel()
-
             with contextlib.suppress(asyncio.CancelledError):
                 await self._monitor_task
-
             self._monitor_task = None
             logger.info("Proxy monitor stopped")
 
@@ -264,19 +225,12 @@ class InstagramClient:
         if self.settings.proxy_url and not self._proxy_alive.is_set():
             raise RuntimeError("Proxy is DOWN. Operation blocked to prevent IP leak.")
 
-    # ------------------------------------------------------------------ #
-    #  Session                                                             #
-    # ------------------------------------------------------------------ #
-
     async def _save_session_encrypted(self) -> None:
         f = self._get_fernet()
-
-        # Додано cast для Strict Mode
         settings_dict = cast(
             dict[str, Any],
             await asyncio.to_thread(self.client.get_settings),  # type: ignore[reportUnknownArgumentType, reportUnknownMemberType]
         )
-
         raw = json.dumps(settings_dict).encode("utf-8")
         self.session_path.parent.mkdir(parents=True, exist_ok=True)
         self.session_path.write_bytes(f.encrypt(raw))
@@ -290,37 +244,24 @@ class InstagramClient:
         except InvalidToken as e:
             raise ValueError("Session decryption failed: wrong key or corrupted file") from e
 
-        # Додано cast для Strict Mode
         settings_dict = cast(dict[str, Any], json.loads(raw.decode("utf-8")))
-
         await asyncio.to_thread(self.client.set_settings, settings_dict)  # type: ignore[reportUnknownArgumentType, reportUnknownMemberType]
         logger.info("Session decrypted and loaded into client (in-memory)")
-
-    # ------------------------------------------------------------------ #
-    #  Auth                                                                #
-    # ------------------------------------------------------------------ #
 
     async def check_session_valid(self) -> bool:
         try:
             user_id = self.client.user_id
             if not user_id:
-                logger.warning("Session validation failed: No user_id found in loaded settings.")
                 return False
-
-            # Додано str() для Strict Mode
             await asyncio.to_thread(self.client.user_info, str(user_id))
             return True
-        except Exception as e:
-            logger.warning(f"Session validation failed: {e}")
+        except Exception:
             return False
 
     async def login(self) -> bool:
         if not await self._verify_proxy():
             return False
-        # [DEV ONLY] — ЗАКОМЕНТУВАТИ ПЕРЕД PRODUCTION --------------------------------
-        if self.settings.debug:
-            await self.run_proxy_leak_check()
-        # ------------------------------------------------------------------------
+
         if self.session_path.exists():
             try:
                 logger.info(f"Loading session from {self.session_path}")
@@ -329,11 +270,8 @@ class InstagramClient:
                 if await self.check_session_valid():
                     logger.info("Session restored and validated successfully")
                     self.start_proxy_monitor()
-
-                    delay = 1.5 + secrets.randbelow(2501) / 1000.0  # 1.500 – 4.000
-                    logger.info(f"Post-restore human delay: {delay:.1f}s")
+                    delay = 1.5 + secrets.randbelow(2501) / 1000.0
                     await asyncio.sleep(delay)
-
                     return True
             except Exception as e:
                 logger.error(f"Failed to load or validate session: {e}")
@@ -351,12 +289,8 @@ class InstagramClient:
                 await self._save_session_encrypted()
                 logger.info("Login successful, session saved")
                 self.start_proxy_monitor()
-
-                # Людська пауза після логіну перед першою дією
-                delay = 3.0 + secrets.randbelow(5001) / 1000.0  # 3.000 – 8.000
-                logger.info(f"Post-login human delay: {delay:.1f}s")
+                delay = 3.0 + secrets.randbelow(5001) / 1000.0
                 await asyncio.sleep(delay)
-
                 return True
 
         except ChallengeRequired as e:
@@ -366,14 +300,7 @@ class InstagramClient:
             logger.error(f"Login failed (credentials rejected): {e}")
             return False
         except BadPassword as e:
-            error_text = str(e).lower()
-            if "facebook" in error_text or "blacklist" in error_text or "ip" in error_text:
-                logger.error(
-                    f"IP заблокований Instagram. "
-                    f"Зміни session ID у PROXY_URL для отримання нового IP: {e}"
-                )
-            else:
-                logger.error(f"Невірний пароль Instagram: {e}")
+            logger.error(f"Auth Block / Bad Password: {e}")
             return False
         except Exception as e:
             logger.error(f"Unexpected login error: {e}")
@@ -381,22 +308,24 @@ class InstagramClient:
 
         return False
 
+    @with_api_retry
     async def send_direct_message(self, user_id: str, message_text: str) -> bool:
-        """Відправка DM. Прокидає помилки авторизації наверх для обробки в Engine."""
+        """Відправка DM з автоматичним retry для мережевих помилок."""
         await self._assert_proxy_alive()
+        logger.info(f"Sending DM to user_id: {user_id}")
+        result = await asyncio.to_thread(
+            self.client.direct_send,  # type: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+            message_text,
+            user_ids=[int(user_id)],
+        )
+        return bool(result)
 
-        try:
-            logger.info(f"Sending DM to user_id: {user_id}")
-            result = await asyncio.to_thread(
-                self.client.direct_send,  # type: ignore[reportUnknownArgumentType, reportUnknownMemberType]
-                message_text,
-                user_ids=[int(user_id)],
-            )
-            return bool(result)
-        except ChallengeRequired:
-            raise
-        except LoginRequired:
-            raise
-        except Exception as e:
-            logger.error(f"Error sending DM to {user_id}: {e}")
-            return False
+    @with_api_retry
+    async def get_direct_inbox(self, limit: int = 20) -> list[Any]:
+        """Отримання списку inbox threads з автоматичним retry."""
+        await self._assert_proxy_alive()
+        logger.info(f"Fetching direct inbox (limit={limit})")
+        return await asyncio.to_thread(
+            self.client.direct_threads,  # type: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+            amount=limit,
+        )
