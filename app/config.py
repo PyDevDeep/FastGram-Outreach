@@ -12,8 +12,6 @@ class Settings(BaseSettings):
     proxy_url: str = ""
     session_file_path: str = str(Path("sessions") / "session.json")
     daily_message_limit: int = 20
-    min_delay_seconds: int = 60
-    max_delay_seconds: int = 300
     min_delay_seconds: int = Field(default=30)
     max_delay_seconds: int = Field(default=60)
 

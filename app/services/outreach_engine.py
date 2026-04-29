@@ -1,8 +1,7 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import httpx
 from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
     ChallengeRequired,
     LoginRequired,
@@ -10,6 +9,7 @@ from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
 
 from app.config import get_settings
 from app.services.instagram_client import InstagramClient
+from app.services.notification_service import NotificationService
 from app.services.pause_manager import PauseManager
 from app.services.proxy_rotator import ProxyRotator
 from app.services.sheets_client import GoogleSheetsClient
@@ -28,12 +28,14 @@ class OutreachEngine:
         warmup_manager: WarmupManager,
         proxy_rotator: ProxyRotator,
         pause_manager: PauseManager,
+        notification_service: NotificationService,
     ) -> None:
         self.instagram_client = instagram_client
         self.sheets_client = sheets_client
         self.warmup_manager = warmup_manager
         self.proxy_rotator = proxy_rotator
         self.pause_manager = pause_manager
+        self.notification_service = notification_service
         self.settings = get_settings()
         self._state = "idle"
         self.sent_today = 0
@@ -62,25 +64,21 @@ class OutreachEngine:
     async def generate_delay(self, min_sec: int, max_sec: int) -> float:
         return await random_delay(min_sec, max_sec)
 
-    async def _send_block_alert(self, reason: str, sent_count: int, username: str) -> None:
-        """Відправляє Push-сповіщення у n8n про блокування акаунта."""
-        webhook_url = self.settings.n8n_webhook_url
-        if not webhook_url:
-            logger.warning("N8N_WEBHOOK_URL не налаштовано. Алерт про блокування проігноровано.")
-            return
+    def calculate_batch_estimates(self, requested_batch_size: int | None = None) -> tuple[int, str]:
+        limit = requested_batch_size or self.settings.daily_message_limit
+        avg_delay = (self.settings.min_delay_seconds + self.settings.max_delay_seconds) / 2
+        est_seconds = limit * (avg_delay + 5)  # +5s typing simulation
+        est_completion = (datetime.now(UTC) + timedelta(seconds=est_seconds)).isoformat()
+        return limit, est_completion
 
-        payload = {
-            "reason": reason,
-            "sent_count": sent_count,
-            "timestamp": datetime.now(UTC).date().isoformat(),
-            "username": username,
-        }
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.post(webhook_url, json=payload, timeout=5.0)
-                logger.info("Alert sent to n8n webhook successfully.")
-        except Exception as e:
-            logger.error(f"Failed to send block alert to n8n: {e}")
+    async def _handle_account_block(
+        self, reason: str, row_index: int, timestamp: str, sent_count: int, username: str
+    ) -> int:
+        self.state = "blocked"
+        self.pause_manager.trigger_pause(reason)
+        await self.sheets_client.update_contact_status(row_index, "Failed", timestamp)
+        await self.notification_service.send_block_alert(reason, sent_count, username)
+        return 1
 
     async def run_batch(
         self, batch_size: int | None = None, dry_run: bool = False
@@ -198,11 +196,9 @@ class OutreachEngine:
 
             except ChallengeRequired as e:
                 logger.critical(f"Challenge Required triggered by {username}: {e}")
-                self.state = "blocked"
-                self.pause_manager.trigger_pause("ChallengeRequired")
-                await self.sheets_client.update_contact_status(int(row_index), "Failed", timestamp)
-                failed_count += 1
-                await self._send_block_alert("ChallengeRequired", sent_count, str(username))
+                failed_count += await self._handle_account_block(
+                    "ChallengeRequired", int(row_index), timestamp, sent_count, str(username)
+                )
                 break
 
             except LoginRequired as e:
@@ -217,14 +213,12 @@ class OutreachEngine:
                     failed_count += 1
                 else:
                     logger.critical("Re-login failed. Blocking engine.")
-                    self.state = "blocked"
-                    self.pause_manager.trigger_pause("LoginRequired")
-                    await self.sheets_client.update_contact_status(
-                        int(row_index), "Failed", timestamp
-                    )
-                    failed_count += 1
-                    await self._send_block_alert(
-                        "LoginRequired (Re-login failed)", sent_count, str(username)
+                    failed_count += await self._handle_account_block(
+                        "LoginRequired (Re-login failed)",
+                        int(row_index),
+                        timestamp,
+                        sent_count,
+                        str(username),
                     )
                     break
 

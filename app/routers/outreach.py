@@ -1,5 +1,4 @@
 import uuid
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -33,10 +32,7 @@ async def start_outreach(
         raise HTTPException(status_code=400, detail=f"Engine is currently {engine.state}")
 
     task_id = str(uuid.uuid4())
-    limit = request.batch_size or engine.settings.daily_message_limit
-    avg_delay = (engine.settings.min_delay_seconds + engine.settings.max_delay_seconds) / 2
-    est_seconds = limit * (avg_delay + 5)  # +5s на типізацію
-    est_completion = (datetime.now(UTC) + timedelta(seconds=est_seconds)).isoformat()
+    limit, est_completion = engine.calculate_batch_estimates(request.batch_size)
 
     background_tasks.add_task(
         engine.run_batch, batch_size=request.batch_size, dry_run=request.dry_run
