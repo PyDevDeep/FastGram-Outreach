@@ -1,4 +1,3 @@
-
 [tool.poetry]
 name = "fastgram-outreach"
 version = "0.1.0"
@@ -39,8 +38,12 @@ exclude = [".venv", "__pycache__", "logs"]
 select = ["E", "F", "I", "B", "S", "W", "N", "UP", "C4", "SIM", "RUF", "A", "DTZ", "TID", "ASYNC", "PT"]
 ignore = ["F401", "E501", "B008", "RUF001", "RUF002", "RUF003", "N815", "S107"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S108"]
+"**/tests/*" = ["S101", "S105", "S108"]
+
 [tool.pyright]
 include = ["app"]
-exclude = ["**/node_modules", "**/.*", "**/__pycache__", "build", "dist", "venv", ".venv",]
+exclude = ["**/node_modules", "**/.*", "**/__pycache__", "build", "dist", "venv", ".venv"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
