@@ -106,7 +106,7 @@ The authors are not responsible for account bans or other consequences.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/[INSERT_USERNAME]/fastgram.git
+git clone https://github.com/PyDevDeep/FastGram-Outreach.git
 cd fastgram
 ```
 
