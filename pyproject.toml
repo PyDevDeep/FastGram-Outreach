@@ -47,3 +47,6 @@ include = ["app"]
 exclude = ["**/node_modules", "**/.*", "**/__pycache__", "build", "dist", "venv", ".venv"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

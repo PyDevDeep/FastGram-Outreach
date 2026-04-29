@@ -203,7 +203,7 @@ class TestInstagramClientProxy:
         instagram_client.settings.proxy_max_failures = 2
         mock_to_thread.return_value = False  # _check_proxy returns False
 
-        with patch("asyncio.sleep", new_callable=AsyncMock):
+        with patch("app.services.instagram_client.asyncio.sleep", new_callable=AsyncMock):
             task = asyncio.create_task(instagram_client._proxy_monitor_loop())
             await asyncio.sleep(0.01)  # Yield to event loop
 
