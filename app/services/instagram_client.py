@@ -1,8 +1,3 @@
-"""
-File: app/services/instagram_client.py
-Task: 4.1.1 - Retry logic & Instagrapi Wrapper
-"""
-
 import asyncio
 import contextlib
 import json
@@ -25,7 +20,7 @@ from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
 from requests.adapters import HTTPAdapter
 from requests.models import PreparedRequest, Response
 
-from app.config import get_settings
+from app.config import Settings
 from app.utils.logger import setup_logger
 
 logger = setup_logger("instagram_client")
@@ -120,11 +115,12 @@ class NoFallbackProxyAdapter(HTTPAdapter):
 
 
 class InstagramClient:
-    def __init__(self) -> None:
-        self.settings = get_settings()
-        self.client = Client()
+    def __init__(self, settings: Settings, client_factory: Callable[[], Client]) -> None:
+        self.settings = settings
+        self.client = client_factory()
         self.session_path = Path(self.settings.session_file_path)
         self.client.delay_range = [5, 15]
+        self._session_lock = asyncio.Lock()
 
         self._validate_encryption_key()
         self.client.set_locale(self.settings.instagram_locale)
@@ -187,10 +183,8 @@ class InstagramClient:
     async def _proxy_monitor_loop(self) -> None:
         if not self.settings.proxy_url:
             return
-
         failures = 0
         logger.info(f"Proxy monitor started (interval: {self.settings.proxy_check_interval}s)")
-
         while True:
             await asyncio.sleep(self.settings.proxy_check_interval)
             alive = await asyncio.to_thread(self._check_proxy)
@@ -238,13 +232,15 @@ class InstagramClient:
         )
         raw = json.dumps(settings_dict).encode("utf-8")
         self.session_path.parent.mkdir(parents=True, exist_ok=True)
-        self.session_path.write_bytes(f.encrypt(raw))
+        async with self._session_lock:
+            await asyncio.to_thread(self.session_path.write_bytes, f.encrypt(raw))
         logger.info(f"Session encrypted and saved to {self.session_path}")
 
     async def _load_session_encrypted(self) -> None:
         f = self._get_fernet()
         try:
-            encrypted = self.session_path.read_bytes()
+            async with self._session_lock:
+                encrypted = await asyncio.to_thread(self.session_path.read_bytes)
             raw = f.decrypt(encrypted)
         except InvalidToken as e:
             raise ValueError("Session decryption failed: wrong key or corrupted file") from e

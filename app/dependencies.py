@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security.api_key import APIKeyHeader
+from instagrapi import Client  # type: ignore[reportMissingTypeStubs]
 
 from app.config import get_settings
 from app.services.instagram_client import InstagramClient
@@ -28,7 +29,7 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
 
 @lru_cache
 def get_instagram_client() -> InstagramClient:
-    return InstagramClient()
+    return InstagramClient(settings=get_settings(), client_factory=Client)
 
 
 @lru_cache
