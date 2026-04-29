@@ -145,6 +145,11 @@ class InstagramClient:
         else:
             logger.warning("No proxy configured. High risk of account ban.")
 
+    @property
+    def is_proxy_alive(self) -> bool:
+        """Returns True if the proxy is currently alive or if no proxy is configured."""
+        return self._proxy_alive.is_set()
+
     def _get_fernet(self) -> Fernet:
         return Fernet(self.settings.session_encryption_key.encode())
 

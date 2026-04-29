@@ -142,3 +142,77 @@ class GoogleSheetsClient:
         except Exception as e:
             logger.error(f"Failed to add reply data for row {row_index}: {e}")
             return False
+
+    async def get_all_contacts(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        sheet_name: str = "Contacts",
+    ) -> list[dict[str, Any]]:
+        """Отримує список всіх лідів з можливістю фільтрації за статусом."""
+
+        def _fetch() -> list[dict[str, Any]]:
+            worksheet = self.sheet.worksheet(sheet_name)
+            records = worksheet.get_all_records()
+            result: list[dict[str, Any]] = []
+
+            for i, row in enumerate(records):
+                if status and str(row.get("Status", "")).strip().lower() != status.lower():
+                    continue
+                row_data = dict(row)
+                row_data["_row_index"] = i + 2
+                result.append(row_data)
+
+            return result[offset : offset + limit]
+
+        try:
+            return await asyncio.to_thread(_fetch)
+        except Exception as e:
+            logger.error(f"Error fetching contacts: {e}")
+            return []
+
+    async def update_contact_tag(
+        self, lead_id: str, tag: str, sheet_name: str = "Contacts"
+    ) -> dict[str, Any] | None:
+        """Оновлює тег для конкретного ліда (за Instagram User ID або Row ID)."""
+
+        def _update() -> dict[str, Any] | None:
+            worksheet = self.sheet.worksheet(sheet_name)
+            records = worksheet.get_all_records()
+            headers = worksheet.row_values(1)
+
+            try:
+                tag_col = headers.index("Tag") + 1
+            except ValueError as e:
+                raise ValueError("Required column 'Tag' not found") from e
+
+            row_index = None
+            target_row = None
+            for i, row in enumerate(records):
+                # Підтримуємо пошук як за Instagram User ID, так і за Row ID (якщо він там є)
+                if (
+                    str(row.get("Instagram User ID", "")) == lead_id
+                    or str(row.get("_row_index", "")) == lead_id
+                    or str(i + 2) == lead_id
+                ):
+                    row_index = i + 2
+                    target_row = dict(row)
+                    target_row["_row_index"] = row_index
+                    break
+
+            if not row_index or not target_row:
+                return None
+
+            worksheet.update_cells([gspread.Cell(row=row_index, col=tag_col, value=tag)])
+            target_row["Tag"] = tag
+            return target_row
+
+        try:
+            updated = await asyncio.to_thread(_update)
+            if updated:
+                logger.info(f"Updated tag to {tag} for lead {lead_id}")
+            return updated
+        except Exception as e:
+            logger.error(f"Failed to update tag for lead {lead_id}: {e}")
+            return None
