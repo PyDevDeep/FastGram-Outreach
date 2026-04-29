@@ -1,6 +1,7 @@
 """Tests for instagram_client module."""
 
 import asyncio
+import contextlib
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -203,12 +204,15 @@ class TestInstagramClientProxy:
         instagram_client.settings.proxy_max_failures = 2
         mock_to_thread.return_value = False  # _check_proxy returns False
 
-        with patch("app.services.instagram_client.asyncio.sleep", new_callable=AsyncMock):
-            task = asyncio.create_task(instagram_client._proxy_monitor_loop())
-            await asyncio.sleep(0.01)  # Yield to event loop
+        # Make sleep raise CancelledError on the 3rd call to break the infinite loop
+        with patch(
+            "app.services.instagram_client.asyncio.sleep", new_callable=AsyncMock
+        ) as mock_sleep:
+            mock_sleep.side_effect = [None, None, asyncio.CancelledError()]
+            with contextlib.suppress(asyncio.CancelledError):
+                await instagram_client._proxy_monitor_loop()
 
         assert not instagram_client.is_proxy_alive
-        task.cancel()
 
     @pytest.mark.asyncio
     async def test_assert_proxy_alive_raises(self, instagram_client):
