@@ -193,12 +193,17 @@ class TestWarmupRouter:
 
 class TestTrackingRouter:
     def test_check_replies(self, api_headers):
-        # Tracking router has its own prefix /tracking
-        # Let's mock ReplyTracker dependency
-        with patch("app.routers.tracking.ReplyTracker") as mock_tracker_class:
-            mock_instance = mock_tracker_class.return_value
-            mock_instance.process_and_tag = AsyncMock(return_value={"processed": 5})
+        from app.dependencies import get_reply_tracker
 
-            response = client.get("/tracking/check-replies", headers=api_headers)
-            assert response.status_code == 200
-            assert response.json()["stats"]["processed"] == 5
+        mock_tracker = MagicMock()
+        mock_tracker.process_and_tag = AsyncMock(return_value={"processed": 5})
+
+        # Override the dependency
+        app.dependency_overrides[get_reply_tracker] = lambda: mock_tracker
+
+        response = client.get("/tracking/check-replies", headers=api_headers)
+        assert response.status_code == 200
+        assert response.json()["stats"]["processed"] == 5
+
+        # Clean up
+        app.dependency_overrides.pop(get_reply_tracker, None)

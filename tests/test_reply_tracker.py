@@ -38,8 +38,10 @@ class TestReplyTracker:
         assert reply_tracker.classify_reply("no stop") == "NotInterested"
         assert reply_tracker.classify_reply("not interested") == "NotInterested"
 
-        # Mixed/Unclear
-        assert reply_tracker.classify_reply("no but yes") == "Unclear"
+        # Mixed (Negative takes priority now)
+        assert reply_tracker.classify_reply("no but yes") == "NotInterested"
+
+        # Unclear
         assert reply_tracker.classify_reply("what?") == "Unclear"
         assert reply_tracker.classify_reply("") == "Unclear"
 
