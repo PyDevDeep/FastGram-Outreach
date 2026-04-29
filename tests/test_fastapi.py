@@ -203,7 +203,7 @@ class TestTrackingRouter:
 
         response = client.get("/tracking/check-replies", headers=api_headers)
         assert response.status_code == 200
-        assert response.json()["stats"]["processed"] == 5
+        assert response.json()["processed"] == 5
 
         # Clean up
         app.dependency_overrides.pop(get_reply_tracker, None)
