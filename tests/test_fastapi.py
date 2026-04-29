@@ -63,6 +63,11 @@ def mock_dependencies():
     mock_pause.is_paused.return_value = True
     app.dependency_overrides[get_pause_manager] = lambda: mock_pause
 
+    # Mock Auth
+    from app.dependencies import verify_api_key
+
+    app.dependency_overrides[verify_api_key] = lambda: "test_api_key"
+
     yield
 
     app.dependency_overrides.clear()
@@ -85,8 +90,16 @@ class TestDependencies:
         assert response.status_code == 200
 
     def test_invalid_api_key(self):
+        from app.dependencies import verify_api_key
+
+        # Temporarily remove auth mock
+        mock_auth = app.dependency_overrides.pop(verify_api_key)
+
         response = client.post("/outreach/start", headers={"X-API-Key": "wrong"})
         assert response.status_code == 401
+
+        # Restore mock
+        app.dependency_overrides[verify_api_key] = mock_auth
 
 
 # ==========================================

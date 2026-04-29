@@ -46,10 +46,10 @@ class ReplyTracker:
         is_pos = any(kw in text for kw in self.positive_keywords)
         is_neg = any(kw in text for kw in self.negative_keywords)
 
-        if is_pos and not is_neg:
-            return "Interested"
-        if is_neg and not is_pos:
+        if is_neg:
             return "NotInterested"
+        if is_pos:
+            return "Interested"
 
         return "Unclear"
 

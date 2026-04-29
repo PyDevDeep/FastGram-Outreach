@@ -42,7 +42,7 @@ class TestPauseManager:
         assert pause_manager._state["reason"] == "Action Blocked"
 
         # Check if the timestamp is saved and is in the future
-        resume_time = datetime.fromisoformat(pause_manager._state["resume_timestamp"])
+        resume_time = datetime.fromisoformat(pause_manager._state["resume_at"])
         assert resume_time > datetime.now(UTC)
 
     def test_is_paused_expires(self, pause_manager):
@@ -50,7 +50,7 @@ class TestPauseManager:
         past_time = datetime.now(UTC) - timedelta(hours=1)
         pause_manager._state = {
             "is_paused": True,
-            "resume_timestamp": past_time.isoformat(),
+            "resume_at": past_time.isoformat(),
             "reason": "Test",
         }
         pause_manager._save_state(pause_manager._state)
@@ -64,13 +64,13 @@ class TestPauseManager:
 
         pause_manager.manual_resume()
         assert pause_manager.is_paused() is False
-        assert pause_manager._state["resume_timestamp"] is None
+        assert pause_manager._state["resume_at"] is None
         assert pause_manager._state["reason"] is None
 
     def test_get_remaining_pause_time(self, pause_manager):
         assert pause_manager.get_remaining_pause_time() is None
 
-        pause_manager.trigger_pause()
+        pause_manager.trigger_pause(reason="Rate Limit")
         remaining = pause_manager.get_remaining_pause_time()
         assert remaining is not None
-        assert ":" in remaining  # e.g. "23:59:59"
+        assert remaining.total_seconds() > 0
