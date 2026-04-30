@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime
 
 from sqlalchemy.dialects.postgresql import insert
 
@@ -10,12 +11,26 @@ from app.utils.logger import setup_logger
 logger = setup_logger("migration")
 
 
+def parse_sheet_date(date_str: str) -> datetime | None:
+    if not date_str:
+        return None
+    try:
+        # Парсимо ISO формат
+        return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            # Парсимо звичайний формат та робимо його timezone-aware
+            return datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+        except ValueError as e:
+            logger.warning(f"Не вдалося розпарсити дату: {date_str}. Помилка: {e}")
+            return None
+
+
 async def migrate_data() -> None:
     logger.info("Починаємо міграцію даних з Google Sheets у PostgreSQL...")
 
     try:
         sheets = GoogleSheetsClient()
-        # Тягнемо всіх лідів (ліміт 10000 для запасу)
         contacts = await sheets.get_all_contacts(limit=10000)
     except Exception as e:
         logger.critical(f"Помилка підключення до Google Sheets: {e}")
@@ -25,7 +40,7 @@ async def migrate_data() -> None:
         logger.warning("Google Sheets порожній. Немає чого мігрувати.")
         return
 
-    logger.info(f"Знайдено {len(contacts)} записів. Заливаємо в БД...")
+    logger.info(f"Знайдено {len(contacts)} записів. Заливаємо/Оновлюємо в БД...")
 
     async with AsyncSessionLocal() as session:
         success_count = 0
@@ -37,16 +52,20 @@ async def migrate_data() -> None:
             template = str(row.get("Message Template", "")).strip()
             status = str(row.get("Status", "pending")).strip().lower()
 
-            # Поля для трекінгу відповідей
             reply_text = str(row.get("Reply Text", "")).strip() or None
             tag = str(row.get("Tag", "")).strip() or None
 
+            # ВИТЯГУЄМО ДАТИ
+            sent_str = str(row.get("Sent Timestamp", "")).strip()
+            reply_str = str(row.get("Reply Timestamp", "")).strip()
+
+            sent_timestamp = parse_sheet_date(sent_str)
+            reply_timestamp = parse_sheet_date(reply_str)
+
             if not user_id or not username:
-                logger.warning(f"Пропуск рядка без ID/Username: {row}")
                 error_count += 1
                 continue
 
-            # Формуємо запит вставки. Використовуємо діалект PostgreSQL для UPSERT
             stmt = insert(Lead).values(
                 instagram_username=username,
                 instagram_user_id=user_id,
@@ -54,15 +73,19 @@ async def migrate_data() -> None:
                 status=status,
                 reply_text=reply_text,
                 tag=tag,
+                sent_timestamp=sent_timestamp,  # <-- ДОДАНО
+                reply_timestamp=reply_timestamp,  # <-- ДОДАНО
             )
 
-            # Якщо instagram_user_id вже є в базі — оновлюємо статус і теги (UPSERT)
+            # UPSERT: Оновлюємо існуючі записи (включаючи дати)
             stmt = stmt.on_conflict_do_update(
                 index_elements=["instagram_user_id"],
                 set_={
                     "status": stmt.excluded.status,
                     "reply_text": stmt.excluded.reply_text,
                     "tag": stmt.excluded.tag,
+                    "sent_timestamp": stmt.excluded.sent_timestamp,
+                    "reply_timestamp": stmt.excluded.reply_timestamp,
                 },
             )
 
