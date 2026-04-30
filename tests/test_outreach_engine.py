@@ -253,15 +253,21 @@ class TestOutreachEngineRunBatch:
         self, mock_typing, mock_delay, outreach_engine
     ):
         """LoginRequired should attempt re-login and continue if successful."""
-        # First call raises LoginRequired, next calls succeed (not needed since we mock success)
+        # 1. Start batch (login succeeds)
+        # 2. First message throws LoginRequired
+        # 3. Engine calls login again (succeeds)
+        # 4. Second message succeeds
         outreach_engine.instagram_client.send_direct_message.side_effect = [
             LoginRequired("Token expired"),
             True,
         ]
+        outreach_engine.instagram_client.login.return_value = True
 
         result = await outreach_engine.run_batch()
 
-        assert outreach_engine.instagram_client.login.call_count == 1
+        # Login is called twice: once at the very beginning of the batch,
+        # and once during the recovery process.
+        assert outreach_engine.instagram_client.login.call_count == 2
         assert result["failed"] == 1  # The one that triggered LoginRequired failed
         assert result["sent"] == 1  # The second one succeeded
         assert outreach_engine.state == "idle"
@@ -273,13 +279,16 @@ class TestOutreachEngineRunBatch:
         self, mock_typing, mock_delay, outreach_engine
     ):
         """LoginRequired should block engine if re-login fails."""
+        # We want the initial login check to pass, so the engine starts sending.
+        # But when the first message throws LoginRequired, the RE-LOGIN attempt should fail.
+        outreach_engine.instagram_client.login.side_effect = [True, False]
         outreach_engine.instagram_client.send_direct_message.side_effect = LoginRequired(
             "Token expired"
         )
-        outreach_engine.instagram_client.login.return_value = False
 
         result = await outreach_engine.run_batch()
 
+        assert outreach_engine.instagram_client.login.call_count == 2
         assert result["failed"] == 1
         assert outreach_engine.state == "blocked"
         outreach_engine.pause_manager.trigger_pause.assert_called_once()
