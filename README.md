@@ -272,6 +272,60 @@ docker compose exec api python scripts/test_sheets.py
 
 ---
 
+## 🧪 Testing
+
+The project ships with **82 tests** across 9 modules and achieves **84% overall coverage**.
+
+Run the full test suite with coverage report:
+
+```bash
+poetry run pytest --cov=app --cov-report=term-missing
+```
+
+**Latest results (Python 3.13.11):**
+
+```
+tests/test_fastapi.py                 11 passed
+tests/test_instagram_client.py        17 passed
+tests/test_notification_service.py     3 passed
+tests/test_outreach_engine.py         13 passed
+tests/test_pause_manager.py            6 passed
+tests/test_proxy_rotator.py           11 passed
+tests/test_reply_tracker.py            5 passed
+tests/test_sheets_client.py           11 passed
+tests/test_warmup_manager.py           5 passed
+─────────────────────────────────────────────
+82 passed in 2.72s
+```
+
+**Coverage summary:**
+
+```diff
+ Name                                   Stmts   Miss  Cover
+ -----------------------------------------------------------
++app/config.py                             30      0   100%
++app/services/notification_service.py      20      0   100%
++app/services/proxy_rotator.py             88      0   100%
++app/services/reply_tracker.py             63      1    98%
++app/services/warmup_manager.py            56      1    98%
++app/services/pause_manager.py             67      5    93%
+ app/routers/health.py                     20      2    90%
+ app/services/outreach_engine.py          140     18    87%
+ app/services/sheets_client.py            134     19    86%
+ app/routers/outreach.py                   59     10    83%
+ app/dependencies.py                       43      9    79%
+ app/routers/tracking.py                   19      5    74%
+-app/services/instagram_client.py         220     72    67%
+-app/utils/delay.py                        25     10    60%
+-app/main.py                               29     13    55%
+ -----------------------------------------------------------
+ TOTAL                                   1028    165    84%
+```
+
+> `instagram_client.py` (67%) and `main.py` (55%) have lower coverage due to live Instagram
+> API calls and app-startup side effects that require integration-level testing.
+
+---
 ## 🤝 Contributing
 
 1. Fork the repository
