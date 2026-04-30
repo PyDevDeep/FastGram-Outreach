@@ -29,6 +29,8 @@ async def get_all_leads(
             "message": lead.message_template,
             "sent_at": lead.sent_timestamp,
             "tag": lead.tag,
+            "reply_text": lead.reply_text,
+            "reply_timestamp": lead.reply_timestamp,
         }
         for lead in leads
     ]
