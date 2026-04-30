@@ -7,8 +7,6 @@ from app.utils.logger import setup_logger
 
 logger = setup_logger("auth_router")
 
-# ДОДАНО: dependencies=[Depends(verify_api_key)]
-# Тепер кожен запит до цього роутера зобов'язаний мати правильний X-API-Key
 router = APIRouter(prefix="/auth", tags=["Authentication"], dependencies=[Depends(verify_api_key)])
 
 
@@ -26,6 +24,14 @@ async def check_auth_status(client: InstagramClient = Depends(get_instagram_clie
         return AuthStatusResponse(
             is_valid=False, proxy_alive=False, message="Proxy is down or misconfigured."
         )
+
+    # --- ДОДАНО: Примусове завантаження сесії з диска перед перевіркою ---
+    if client.session_path.exists():
+        try:
+            await client._load_session_encrypted()  # type: ignore[reportPrivateUsage]
+        except Exception as e:
+            logger.error(f"Failed to load session for status check: {e}")
+    # ----------------------------------------------------------------------
 
     is_valid = await client.check_session_valid()
     msg = (
