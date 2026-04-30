@@ -104,6 +104,15 @@ class OutreachEngine:
         # ------------------------------------------
 
         self.state = "running"
+
+        # --- ДОДАНО: Завантаження сесії перед будь-якими діями ---
+        logger.info("Verifying Instagram session before batch...")
+        if not await self.instagram_client.login():
+            logger.critical("Failed to load session or login. Halting batch.")
+            self.state = "blocked"
+            return {"sent": 0, "failed": 0, "remaining": 0, "state": "blocked"}
+        # ----------------------------------------------------------
+
         # 1. PROXY ROTATION CHECK
         if not dry_run and self.proxy_rotator.is_rotation_needed():
             logger.info("Initiating proxy rotation before batch...")
