@@ -28,3 +28,8 @@ export const getStats = async () => {
   const response = await apiClient.get("/leads/stats");
   return response.data;
 };
+
+export const syncLeads = async () => {
+  const response = await apiClient.post("/leads/sync");
+  return response.data;
+};
