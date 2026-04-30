@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getStats } from "./api";
 import { Activity } from "lucide-react";
+import LeadsTable from "./components/LeadsTable";
 
 // Сувора типізація
 interface DashboardStats {
@@ -29,16 +30,16 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
+        {" "}
+        {/* Змінено max-w-4xl на max-w-6xl для ширшої таблиці */}
         <div className="flex items-center gap-3 mb-8">
           <Activity className="w-8 h-8 text-blue-500" />
           <h1 className="text-3xl font-bold">FastGram Dashboard</h1>
         </div>
-
         {error ? (
           <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg">
-            Критична помилка: {error}. Перевір F12 -&gt; Network (CORS або
-            відключений бекенд).
+            Критична помилка: {error}. Перевір F12 -&gt; Network.
           </div>
         ) : stats ? (
           <div className="grid grid-cols-5 gap-4">
@@ -57,6 +58,8 @@ function App() {
         ) : (
           <div className="text-gray-500 animate-pulse">З'єднання з API...</div>
         )}
+        {/* --- ДОДАНО ТАБЛИЦЮ --- */}
+        {!error && <LeadsTable />}
       </div>
     </div>
   );
