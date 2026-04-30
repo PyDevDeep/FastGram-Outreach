@@ -272,11 +272,13 @@ class InstagramClient:
         except Exception:
             return False
 
-    async def login(self) -> bool:
+    async def login(self, verification_code: str | None = None) -> str:
+        """Повертає: 'success', 'challenge_required', 'error'"""
         if not await self._verify_proxy():
-            return False
+            return "error"
 
-        if self.session_path.exists():
+        # Якщо є збережена сесія і ми не намагаємося передати код 2FA
+        if self.session_path.exists() and not verification_code:
             try:
                 logger.info(f"Loading session from {self.session_path}")
                 await self._load_session_encrypted()
@@ -286,17 +288,19 @@ class InstagramClient:
                     self.start_proxy_monitor()
                     delay = 1.5 + secrets.randbelow(2501) / 1000.0
                     await asyncio.sleep(delay)
-                    return True
+                    return "success"
             except Exception as e:
                 logger.error(f"Failed to load or validate session: {e}")
                 await asyncio.sleep(2.0 + secrets.randbelow(3001) / 1000.0)
 
         try:
             logger.info("Attempting fresh login...")
+            # Використовуємо or "", щоб замінити None на порожній рядок
             result = await asyncio.to_thread(
                 self.client.login,
                 self.settings.instagram_username,
                 self.settings.instagram_password,
+                verification_code=verification_code or "",
             )
 
             if result:
@@ -305,22 +309,22 @@ class InstagramClient:
                 self.start_proxy_monitor()
                 delay = 3.0 + secrets.randbelow(5001) / 1000.0
                 await asyncio.sleep(delay)
-                return True
+                return "success"
 
         except ChallengeRequired as e:
-            logger.critical(f"Challenge Required (2FA/Captcha). Cannot proceed automatically: {e}")
-            return False
+            logger.warning(f"Challenge Required (2FA/Captcha): {e}")
+            return "challenge_required"
         except LoginRequired as e:
             logger.error(f"Login failed (credentials rejected): {e}")
-            return False
+            return "error"
         except BadPassword as e:
             logger.error(f"Auth Block / Bad Password: {e}")
-            return False
+            return "error"
         except Exception as e:
             logger.error(f"Unexpected login error: {e}")
-            return False
+            return "error"
 
-        return False
+        return "error"
 
     @with_api_retry
     async def send_direct_message(self, user_id: str, message_text: str) -> bool:

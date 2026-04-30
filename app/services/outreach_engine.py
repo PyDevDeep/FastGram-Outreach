@@ -108,7 +108,7 @@ class OutreachEngine:
         self.state = "running"
 
         logger.info("Verifying Instagram session before batch...")
-        if not await self.instagram_client.login():
+        if await self.instagram_client.login() != "success":
             logger.critical("Failed to load session or login. Halting batch.")
             self.state = "blocked"
             return {"sent": 0, "failed": 0, "remaining": 0, "state": "blocked"}

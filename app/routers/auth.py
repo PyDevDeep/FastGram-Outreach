@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.dependencies import get_instagram_client, verify_api_key
@@ -14,6 +14,34 @@ class AuthStatusResponse(BaseModel):
     is_valid: bool
     proxy_alive: bool
     message: str
+
+
+class LoginRequest(BaseModel):
+    verification_code: str | None = None
+
+
+class LoginResponse(BaseModel):
+    status: str
+    message: str
+
+
+@router.post("/login", response_model=LoginResponse)
+async def trigger_login(req: LoginRequest, client: InstagramClient = Depends(get_instagram_client)):
+    """
+    Ініціює логін.
+    Якщо отримує status 'challenge_required', фронтенд має показати поле для вводу коду
+    і повторити запит, передавши verification_code.
+    """
+    status = await client.login(verification_code=req.verification_code)
+
+    if status == "success":
+        return LoginResponse(status="success", message="Успішна авторизація.")
+    elif status == "challenge_required":
+        return LoginResponse(
+            status="challenge_required", message="Потрібен код 2FA (перевірте SMS/App)."
+        )
+    else:
+        raise HTTPException(status_code=401, detail="Помилка авторизації. Перевірте логи.")
 
 
 @router.get("/status", response_model=AuthStatusResponse)
