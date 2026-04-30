@@ -75,11 +75,12 @@ class OutreachEngine:
         return limit, est_completion
 
     async def _handle_account_block(
-        self, reason: str, row_index: int, timestamp: str, sent_count: int, username: str
+        self, reason: str, lead_id: int, timestamp: str, sent_count: int, username: str
     ) -> int:
         self.state = "blocked"
         self.pause_manager.trigger_pause(reason)
-        await self.sheets_client.update_contact_status(row_index, "Failed", timestamp)
+        # Змінено на запис у БД замість Sheets
+        await self.lead_repository.update_contact_status(lead_id, "Failed", timestamp)
         await self.notification_service.send_block_alert(reason, sent_count, username)
         return 1
 
@@ -91,7 +92,6 @@ class OutreachEngine:
             logger.warning(f"Cannot start new batch. Engine is currently in '{self.state}' state.")
             return {"sent": 0, "failed": 0, "remaining": 0, "state": self.state}
 
-        # --- ДОДАНО: Перевірка 24-годинної паузи ---
         if self.pause_manager.is_paused():
             rem_time = self.pause_manager.get_remaining_pause_time()
             logger.warning(
@@ -104,19 +104,15 @@ class OutreachEngine:
                 "state": "paused",
                 "message": f"Paused. Resume in {rem_time}",
             }
-        # ------------------------------------------
 
         self.state = "running"
 
-        # --- ДОДАНО: Завантаження сесії перед будь-якими діями ---
         logger.info("Verifying Instagram session before batch...")
         if not await self.instagram_client.login():
             logger.critical("Failed to load session or login. Halting batch.")
             self.state = "blocked"
             return {"sent": 0, "failed": 0, "remaining": 0, "state": "blocked"}
-        # ----------------------------------------------------------
 
-        # 1. PROXY ROTATION CHECK
         if not dry_run and self.proxy_rotator.is_rotation_needed():
             logger.info("Initiating proxy rotation before batch...")
             new_proxy = await self.proxy_rotator.request_new_ip()
@@ -134,10 +130,12 @@ class OutreachEngine:
                 logger.warning(
                     "Failed to obtain new Proxy IP from provider. Continuing with current IP."
                 )
+
         limit = batch_size or self.settings.daily_message_limit
 
-        pending_contacts = await self.sheets_client.get_pending_contacts()
-        logger.info(f"Fetched {len(pending_contacts)} pending contacts. Dry run: {dry_run}")
+        # --- Читаємо лідів з БД ---
+        pending_contacts = await self.lead_repository.get_pending_contacts(limit=limit)
+        logger.info(f"Fetched {len(pending_contacts)} pending contacts from DB. Dry run: {dry_run}")
 
         sent_count = 0
         failed_count = 0
@@ -148,7 +146,7 @@ class OutreachEngine:
             if self.state in ("blocked", "stopping"):  # type: ignore[reportUnnecessaryContains]
                 logger.warning(f"Engine is {self.state.upper()}. Halting batch processing.")
                 break
-            # 2. Перевірка зміни доби та лімітів
+
             today = datetime.now(UTC).date()
             if today > self._current_date:
                 logger.info("New UTC day detected. Resetting daily sent counter.")
@@ -159,19 +157,19 @@ class OutreachEngine:
                 logger.warning(f"Daily message limit reached ({limit}). Halting batch.")
                 break
 
-            row_index = contact.get("_row_index")
-            username = contact.get("Instagram Username")
-            user_id = contact.get("Instagram User ID")
-            message = contact.get("Message Template")
+            # --- Звертаємося до атрибутів моделі Lead ---
+            lead_id = contact.id
+            username = contact.instagram_username
+            user_id = contact.instagram_user_id
+            message = contact.message_template
 
-            if row_index is None or not user_id or not message:
+            if not user_id or not message:
                 logger.error(f"Missing critical data for {username}. Skipping.")
                 failed_count += 1
                 continue
 
             logger.info(f"Processing contact: {username} (ID: {user_id})")
 
-            # 3. Human-like затримки
             await self.generate_delay(
                 self.settings.min_delay_seconds, self.settings.max_delay_seconds
             )
@@ -179,37 +177,31 @@ class OutreachEngine:
 
             timestamp = datetime.now(UTC).isoformat()
 
-            # 4. Dry Run
             if dry_run:
                 logger.info(f"[DRY RUN] Simulating send to {username}")
-                await self.sheets_client.update_contact_status(int(row_index), "Sent", timestamp)
+                await self.lead_repository.update_contact_status(lead_id, "Sent", timestamp)
                 sent_count += 1
                 self.sent_today += 1
                 continue
 
-            # 5. Реальна відправка та Error Handling
             try:
                 success = await self.instagram_client.send_direct_message(
                     str(user_id), str(message)
                 )
 
                 if success:
-                    await self.sheets_client.update_contact_status(
-                        int(row_index), "Sent", timestamp
-                    )
+                    await self.lead_repository.update_contact_status(lead_id, "Sent", timestamp)
                     sent_count += 1
                     self.sent_today += 1
                     self.proxy_rotator.increment_message_count()
                 else:
-                    await self.sheets_client.update_contact_status(
-                        int(row_index), "Failed", timestamp
-                    )
+                    await self.lead_repository.update_contact_status(lead_id, "Failed", timestamp)
                     failed_count += 1
 
             except ChallengeRequired as e:
                 logger.critical(f"Challenge Required triggered by {username}: {e}")
                 failed_count += await self._handle_account_block(
-                    "ChallengeRequired", int(row_index), timestamp, sent_count, str(username)
+                    "ChallengeRequired", lead_id, timestamp, sent_count, str(username)
                 )
                 break
 
@@ -219,15 +211,13 @@ class OutreachEngine:
                     logger.info(
                         "Re-login successful. State remains running. Moving to next contact."
                     )
-                    await self.sheets_client.update_contact_status(
-                        int(row_index), "Failed", timestamp
-                    )
+                    await self.lead_repository.update_contact_status(lead_id, "Failed", timestamp)
                     failed_count += 1
                 else:
                     logger.critical("Re-login failed. Blocking engine.")
                     failed_count += await self._handle_account_block(
                         "LoginRequired (Re-login failed)",
-                        int(row_index),
+                        lead_id,
                         timestamp,
                         sent_count,
                         str(username),
@@ -236,8 +226,6 @@ class OutreachEngine:
 
             except Exception as e:
                 error_msg = str(e).lower()
-
-                # --- ЖОРСТКИЙ ПАРСИНГ ТЕКСТУ ПОМИЛКИ ---
                 if (
                     "login required" in error_msg
                     or "challenge required" in error_msg
@@ -249,19 +237,17 @@ class OutreachEngine:
                     )
                     failed_count += await self._handle_account_block(
                         f"HiddenAuthError: {e}",
-                        int(row_index),
+                        lead_id,
                         timestamp,
                         sent_count,
                         str(username),
                     )
                     break
-                # ----------------------------------------
 
                 logger.error(f"Unexpected error sending to {username}: {e}")
-                await self.sheets_client.update_contact_status(int(row_index), "Failed", timestamp)
+                await self.lead_repository.update_contact_status(lead_id, "Failed", timestamp)
                 failed_count += 1
 
-        # Повертаємо state в idle тільки якщо він не був примусово заблокований
         if self.state == "running":
             self.state = "idle"
 
