@@ -78,10 +78,21 @@ def mock_notification_service():
     return service
 
 
+# Додайте нову фікстуру до списку фікстур
+@pytest.fixture
+def mock_lead_repository():
+    repository = MagicMock()
+    repository.get_pending_contacts = AsyncMock(return_value=[])
+    repository.update_contact_status = AsyncMock(return_value=True)
+    return repository
+
+
+# Оновіть існуючу фікстуру outreach_engine
 @pytest.fixture
 def outreach_engine(
     mock_instagram_client,
     mock_sheets_client,
+    mock_lead_repository,  # <--- Додано
     mock_warmup_manager,
     mock_proxy_rotator,
     mock_pause_manager,
@@ -97,6 +108,7 @@ def outreach_engine(
         engine = OutreachEngine(
             instagram_client=mock_instagram_client,
             sheets_client=mock_sheets_client,
+            lead_repository=mock_lead_repository,  # <--- Додано
             warmup_manager=mock_warmup_manager,
             proxy_rotator=mock_proxy_rotator,
             pause_manager=mock_pause_manager,
