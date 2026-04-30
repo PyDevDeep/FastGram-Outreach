@@ -33,7 +33,9 @@ class Settings(BaseSettings):
 
     # n8n Webhooks
     n8n_webhook_url: str | None = Field(default=None)
-
+    database_url: str = Field(
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/fastgram"
+    )
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

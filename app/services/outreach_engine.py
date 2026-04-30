@@ -8,6 +8,7 @@ from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
 )
 
 from app.config import get_settings
+from app.repositories.lead_repository import LeadRepository
 from app.services.instagram_client import InstagramClient
 from app.services.notification_service import NotificationService
 from app.services.pause_manager import PauseManager
@@ -25,6 +26,7 @@ class OutreachEngine:
         self,
         instagram_client: InstagramClient,
         sheets_client: GoogleSheetsClient,
+        lead_repository: LeadRepository,
         warmup_manager: WarmupManager,
         proxy_rotator: ProxyRotator,
         pause_manager: PauseManager,
@@ -32,6 +34,7 @@ class OutreachEngine:
     ) -> None:
         self.instagram_client = instagram_client
         self.sheets_client = sheets_client
+        self.lead_repository = lead_repository
         self.warmup_manager = warmup_manager
         self.proxy_rotator = proxy_rotator
         self.pause_manager = pause_manager

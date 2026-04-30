@@ -3,8 +3,11 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security.api_key import APIKeyHeader
 from instagrapi import Client  # type: ignore[reportMissingTypeStubs]
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.database import get_db_session
+from app.repositories.lead_repository import LeadRepository
 from app.services.instagram_client import InstagramClient
 from app.services.notification_service import NotificationService
 from app.services.outreach_engine import OutreachEngine
@@ -25,6 +28,10 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing API Key"
         )
     return api_key
+
+
+def get_lead_repository(session: AsyncSession = Depends(get_db_session)) -> LeadRepository:
+    return LeadRepository(session)
 
 
 @lru_cache
@@ -61,6 +68,7 @@ def get_notification_service() -> NotificationService:
 def get_outreach_engine(
     instagram_client: InstagramClient = Depends(get_instagram_client),
     sheets_client: GoogleSheetsClient = Depends(get_sheets_client),
+    lead_repository: LeadRepository = Depends(get_lead_repository),
     warmup_manager: WarmupManager = Depends(get_warmup_manager),
     proxy_rotator: ProxyRotator = Depends(get_proxy_rotator),
     pause_manager: PauseManager = Depends(get_pause_manager),
@@ -69,6 +77,7 @@ def get_outreach_engine(
     return OutreachEngine(
         instagram_client,
         sheets_client,
+        lead_repository=lead_repository,
         warmup_manager=warmup_manager,
         proxy_rotator=proxy_rotator,
         pause_manager=pause_manager,

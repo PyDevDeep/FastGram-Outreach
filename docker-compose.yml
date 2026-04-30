@@ -13,6 +13,11 @@ services:
       - ./credentials.json:/app/credentials.json:ro
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@fastgram_db:5432/${POSTGRES_DB}
+    depends_on:
+      fastgram_db:
+        condition: service_healthy
     networks:
       - fastgram_network
 
@@ -34,9 +39,30 @@ services:
     networks:
       - fastgram_network
 
+  fastgram_db:
+    image: postgres:15-alpine
+    container_name: fastgram_db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - fastgram_db_data:/var/lib/postgresql/data
+    networks:
+      - fastgram_network
+
 networks:
   fastgram_network:
     driver: bridge
 
 volumes:
   fastgram_n8n_data:
+  fastgram_db_data:
