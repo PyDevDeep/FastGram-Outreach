@@ -78,11 +78,24 @@ def mock_notification_service():
     return service
 
 
-# Додайте нову фікстуру до списку фікстур
+# Оновлена фікстура mock_lead_repository
 @pytest.fixture
 def mock_lead_repository():
     repository = MagicMock()
-    repository.get_pending_contacts = AsyncMock(return_value=[])
+
+    lead1 = MagicMock()
+    lead1.id = 1
+    lead1.instagram_username = "user_1"
+    lead1.instagram_user_id = "123"
+    lead1.message_template = "Hello 1"
+
+    lead2 = MagicMock()
+    lead2.id = 2
+    lead2.instagram_username = "user_2"
+    lead2.instagram_user_id = "456"
+    lead2.message_template = "Hello 2"
+
+    repository.get_pending_contacts = AsyncMock(return_value=[lead1, lead2])
     repository.update_contact_status = AsyncMock(return_value=True)
     return repository
 
@@ -170,7 +183,8 @@ class TestOutreachEngineHelpers:
 
         assert outreach_engine.state == "blocked"
         outreach_engine.pause_manager.trigger_pause.assert_called_with("Spam")
-        outreach_engine.sheets_client.update_contact_status.assert_called_with(
+        # Змінено sheets_client на lead_repository
+        outreach_engine.lead_repository.update_contact_status.assert_called_with(
             2, "Failed", "2023-10-01T12:00:00Z"
         )
         outreach_engine.notification_service.send_block_alert.assert_called_with(
@@ -216,7 +230,8 @@ class TestOutreachEngineRunBatch:
         assert result["remaining"] == 0
         assert outreach_engine.state == "idle"
 
-        assert outreach_engine.sheets_client.update_contact_status.call_count == 2
+        # Змінено sheets_client на lead_repository
+        assert outreach_engine.lead_repository.update_contact_status.call_count == 2
         assert outreach_engine.instagram_client.send_direct_message.call_count == 2
         assert outreach_engine.proxy_rotator.increment_message_count.call_count == 2
 
@@ -229,7 +244,8 @@ class TestOutreachEngineRunBatch:
 
         assert result["sent"] == 2
         assert outreach_engine.instagram_client.send_direct_message.call_count == 0
-        assert outreach_engine.sheets_client.update_contact_status.call_count == 2
+        # Змінено sheets_client на lead_repository
+        assert outreach_engine.lead_repository.update_contact_status.call_count == 2
 
     @pytest.mark.asyncio
     @patch("app.services.outreach_engine.random_delay", new_callable=AsyncMock)

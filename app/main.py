@@ -2,9 +2,10 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.dependencies import get_outreach_engine
-from app.routers import auth, health, outreach, tracking
+from app.routers import auth, health, leads, outreach, tracking
 from app.utils.logger import setup_logger
 
 logger = setup_logger("fastgram_api")
@@ -42,11 +43,20 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+    # --- ДОДАНО: CORS для React-фронтенду ---
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # На етапі деплою замінимо на твій домен
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.include_router(health.router)
     app.include_router(outreach.router)  # Підключено новий роутер
     app.include_router(tracking.router)  # Підключено роутер відстеження
     app.include_router(auth.router)  # Підключено роутер авторизації
+    app.include_router(leads.router)  # ДОДАНО роутер дашборду
 
     return app
 
