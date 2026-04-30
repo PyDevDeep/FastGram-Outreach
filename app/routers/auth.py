@@ -7,7 +7,9 @@ from app.utils.logger import setup_logger
 
 logger = setup_logger("auth_router")
 
-router = APIRouter(prefix="/auth", tags=["Authentication"], dependencies=[Depends(verify_api_key)])
+router = APIRouter(
+    prefix="/api/auth", tags=["Authentication"], dependencies=[Depends(verify_api_key)]
+)
 
 
 class AuthStatusResponse(BaseModel):
