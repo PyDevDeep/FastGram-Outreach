@@ -223,6 +223,28 @@ class OutreachEngine:
                     break
 
             except Exception as e:
+                error_msg = str(e).lower()
+
+                # --- ЖОРСТКИЙ ПАРСИНГ ТЕКСТУ ПОМИЛКИ ---
+                if (
+                    "login required" in error_msg
+                    or "challenge required" in error_msg
+                    or "blocked" in error_msg
+                    or "checkpoint_required" in error_msg
+                ):
+                    logger.critical(
+                        f"Critical error hidden in generic Exception for {username}: {e}"
+                    )
+                    failed_count += await self._handle_account_block(
+                        f"HiddenAuthError: {e}",
+                        int(row_index),
+                        timestamp,
+                        sent_count,
+                        str(username),
+                    )
+                    break
+                # ----------------------------------------
+
                 logger.error(f"Unexpected error sending to {username}: {e}")
                 await self.sheets_client.update_contact_status(int(row_index), "Failed", timestamp)
                 failed_count += 1
