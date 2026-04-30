@@ -1,0 +1,109 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days"
+            }
+          ]
+        }
+      },
+      "id": "8b51d8b2-1b1e-42c2-8438-e6d36e2f17d3",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [180, 240]
+    },
+    {
+      "parameters": {
+        "url": "http://fastgram_api:8000/auth/status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "ТВІЙ_СЕКРЕТНИЙ_КЛЮЧ"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0e2cb05-24ed-4d56-a97d-6ff8b71d60b3",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [400, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.is_valid }}",
+              "value2": false
+            },
+            {
+              "value1": "={{ $json.proxy_alive }}",
+              "value2": false
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "52c42c74-c36b-4e1b-8b5e-47f52079f53c",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [620, 240]
+    },
+    {
+      "parameters": {
+        "chatId": "ТВІЙ_CHAT_ID",
+        "text": "={{ '🚨 КРИТИЧНО: Auth FastGram впав!\\n\\nСтатус сесії (is_valid): ' + $json.is_valid + '\\nСтатус проксі (proxy_alive): ' + $json.proxy_alive + '\\nПричина: ' + $json.message + '\\n\\nНегайно зайди на сервер і запусти скрипт генерації сесії (test_auth.py), інакше розсилка зупинена.' }}",
+        "additionalFields": {}
+      },
+      "id": "8dc73966-2dbf-474d-91b7-9515560b72a4",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [840, 140]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

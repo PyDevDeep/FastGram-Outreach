@@ -122,6 +122,14 @@ class InstagramClient:
         self.client.delay_range = [5, 15]
         self._session_lock = asyncio.Lock()
 
+        # --- ЖОРСТКЕ ПЕРЕХОПЛЕННЯ CHALLENGE ---
+        # Забороняємо бібліотеці просити код у консолі. Вона має просто падати з помилкою.
+        def _challenge_handler(username: str, choice: Any | None = None) -> str:
+            return self._force_challenge_fail()
+
+        self.client.challenge_code_handler = _challenge_handler
+        # --------------------------------------
+
         self._validate_encryption_key()
         self.client.set_locale(self.settings.instagram_locale)
         self.client.set_timezone_offset(self.settings.timezone_offset)
@@ -140,6 +148,11 @@ class InstagramClient:
             logger.info(f"Proxy configured with no-fallback adapter: {self.settings.proxy_url}")
         else:
             logger.warning("No proxy configured. High risk of account ban.")
+
+    def _force_challenge_fail(self) -> str:
+        raise ChallengeRequired(
+            "Challenge required (2FA/Email). Cannot resolve automatically in background."
+        )
 
     @property
     def is_proxy_alive(self) -> bool:
