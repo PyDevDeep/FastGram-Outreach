@@ -3,12 +3,14 @@ import concurrent.futures
 import contextlib
 import json
 import secrets
+import time
 from collections.abc import Callable, Coroutine, Mapping
 from functools import wraps
 from pathlib import Path
 from typing import Any, cast
 
 import requests.exceptions
+import urllib3.exceptions
 from cryptography.fernet import Fernet, InvalidToken
 from instagrapi import Client  # type: ignore[reportMissingTypeStubs]
 from instagrapi.exceptions import (  # type: ignore[reportMissingTypeStubs]
@@ -70,9 +72,9 @@ def with_api_retry[T](
 
 
 class NoFallbackProxyAdapter(HTTPAdapter):
-    """Забороняє fallback на локальний IP, але дозволяє retry на SSL помилки."""
+    """Забороняє fallback на локальний IP, дозволяє retry на SSL та обриви з'єднання."""
 
-    MAX_SSL_RETRIES = 3
+    MAX_RETRIES = 3
 
     def send(
         self,
@@ -85,7 +87,7 @@ class NoFallbackProxyAdapter(HTTPAdapter):
     ) -> Response:
         last_error: Exception | None = None
 
-        for attempt in range(1, self.MAX_SSL_RETRIES + 1):
+        for attempt in range(1, self.MAX_RETRIES + 1):
             try:
                 return super().send(
                     request,
@@ -95,22 +97,25 @@ class NoFallbackProxyAdapter(HTTPAdapter):
                     cert=cert,
                     proxies=proxies,
                 )
-            except requests.exceptions.SSLError as e:
+            except (
+                requests.exceptions.SSLError,
+                requests.exceptions.ProxyError,
+                requests.exceptions.ConnectionError,
+                urllib3.exceptions.ProtocolError,
+            ) as e:
                 last_error = e
-                logger.warning(f"SSL error on attempt {attempt}/{self.MAX_SSL_RETRIES}: {e}")
-                if attempt == self.MAX_SSL_RETRIES:
+                logger.warning(f"Network/Proxy error on attempt {attempt}/{self.MAX_RETRIES}: {e}")
+                if attempt == self.MAX_RETRIES:
                     raise RuntimeError(
-                        f"Proxy SSL failed after {self.MAX_SSL_RETRIES} attempts: {e}"
+                        f"Proxy connection failed after {self.MAX_RETRIES} attempts: {e}"
                     ) from e
-
-                import time
 
                 time.sleep(1.0 * attempt)
 
             except Exception as e:
-                raise RuntimeError(f"Proxy connection failed mid-request: {e}") from e
+                raise RuntimeError(f"Unexpected connection error mid-request: {e}") from e
 
-        raise RuntimeError(f"Proxy SSL failed: {last_error}")
+        raise RuntimeError(f"Proxy SSL/Connection failed: {last_error}")
 
 
 class InstagramClient:
