@@ -28,11 +28,18 @@ class LoginResponse(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-async def trigger_login(req: LoginRequest, client: InstagramClient = Depends(get_instagram_client)):
+async def trigger_login(
+    req: LoginRequest, client: InstagramClient = Depends(get_instagram_client)
+) -> LoginResponse:
     """
-    Ініціює логін.
-    Якщо отримує status 'challenge_required', фронтенд має показати поле для вводу коду
-    і повторити запит, передавши verification_code.
+    Перший виклик (verification_code=None):
+      - Запускає login flow. Якщо Instagram вимагає 2FA — повертає challenge_required.
+      - UI показує поле вводу коду.
+
+    Другий виклик (verification_code="123456"):
+      - Знаходить живий login task (worker-thread заморожений в challenge_handler).
+      - Інжектує код через concurrent.futures.Future — розморожує worker-thread.
+      - Повертає фінальний результат.
     """
     status = await client.login(verification_code=req.verification_code)
 
@@ -47,7 +54,9 @@ async def trigger_login(req: LoginRequest, client: InstagramClient = Depends(get
 
 
 @router.get("/status", response_model=AuthStatusResponse)
-async def check_auth_status(client: InstagramClient = Depends(get_instagram_client)):
+async def check_auth_status(
+    client: InstagramClient = Depends(get_instagram_client),
+) -> AuthStatusResponse:
     """Перевіряє, чи жива поточна сесія та проксі."""
     proxy_alive = client.is_proxy_alive
     if not proxy_alive:
@@ -55,13 +64,21 @@ async def check_auth_status(client: InstagramClient = Depends(get_instagram_clie
             is_valid=False, proxy_alive=False, message="Proxy is down or misconfigured."
         )
 
-    # --- ДОДАНО: Примусове завантаження сесії з диска перед перевіркою ---
+    # Якщо зараз виконується login task (юзер в процесі 2FA) —
+    # не чіпаємо стан клієнта щоб не зіпсувати challenge flow
+    if client._login_task is not None and not client._login_task.done():  # type: ignore[reportPrivateUsage]
+        return AuthStatusResponse(
+            is_valid=False,
+            proxy_alive=True,
+            message="Login in progress (waiting for 2FA code).",
+        )
+
+    # Завантажуємо сесію з диска тільки якщо немає активного login task
     if client.session_path.exists():
         try:
             await client._load_session_encrypted()  # type: ignore[reportPrivateUsage]
         except Exception as e:
             logger.error(f"Failed to load session for status check: {e}")
-    # ----------------------------------------------------------------------
 
     is_valid = await client.check_session_valid()
     msg = (
