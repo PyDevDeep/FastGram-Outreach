@@ -370,20 +370,18 @@ class InstagramClient:
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-        # Скасовуємо те що не перемогло (challenge_waiter або не чіпаємо _login_task)
+        # Скасовуємо ТІЛЬКИ challenge_waiter, ніколи не чіпаємо _login_task
         for task in pending:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+            if task is not self._login_task:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
 
         if self._login_task in done:
-            # Таск завершився раніше ніж спрацював challenge — success або error
             result = self._login_task.result()
             self._login_task = None
             return result
 
-        # challenge_triggered перший — таск живий, worker-thread заморожений
-        # Повертаємо UI сигнал, зберігаючи таск для другого запиту
         return "challenge_required"
 
     async def _do_login(self) -> str:
