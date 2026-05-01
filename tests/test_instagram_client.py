@@ -227,7 +227,8 @@ class TestInstagramClientLogin:
     @patch("app.services.instagram_client.InstagramClient._verify_proxy", return_value=False)
     async def test_login_blocked_if_proxy_dead(self, mock_verify, instagram_client):
         """Login aborted immediately if proxy validation fails."""
-        assert await instagram_client.login() is False
+        # login() повертає рядок "error", а не bool False
+        assert await instagram_client.login() == "error"
         instagram_client.client.login.assert_not_called()
 
     @pytest.mark.asyncio
@@ -244,7 +245,8 @@ class TestInstagramClientLogin:
         with patch(
             "app.services.instagram_client.InstagramClient._verify_proxy", return_value=True
         ):
-            assert await instagram_client.login() is True
+            # login() повертає рядок "success", а не bool True
+            assert await instagram_client.login() == "success"
 
         mock_load.assert_called_once()
         instagram_client.start_proxy_monitor.assert_called_once()
@@ -259,13 +261,14 @@ class TestInstagramClientLogin:
         self, mock_sleep, mock_to_thread, mock_save, mock_exists, instagram_client
     ):
         """Fresh login triggers instagrapi.login and saves encrypted session."""
-        mock_to_thread.return_value = True  # login success
+        mock_to_thread.return_value = True  # інтерпретується як truthy в _do_login
         instagram_client.start_proxy_monitor = MagicMock()
 
         with patch(
             "app.services.instagram_client.InstagramClient._verify_proxy", return_value=True
         ):
-            assert await instagram_client.login() is True
+            # login() повертає рядок "success", а не bool True
+            assert await instagram_client.login() == "success"
 
         mock_save.assert_called_once()
         instagram_client.start_proxy_monitor.assert_called_once()
@@ -276,13 +279,15 @@ class TestInstagramClientLogin:
     async def test_fresh_login_challenge_required(
         self, mock_to_thread, mock_exists, instagram_client
     ):
-        """2FA/Captcha exceptions must fail gracefully."""
+        """2FA/Captcha exception from to_thread must return challenge_required."""
+        # ChallengeRequired з to_thread потрапляє в except всередині _do_login
+        # і повертає "challenge_required", а не bool False
         mock_to_thread.side_effect = ChallengeRequired("2FA needed")
 
         with patch(
             "app.services.instagram_client.InstagramClient._verify_proxy", return_value=True
         ):
-            assert await instagram_client.login() is False
+            assert await instagram_client.login() == "challenge_required"
 
 
 class TestInstagramClientActions:

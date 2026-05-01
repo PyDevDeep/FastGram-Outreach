@@ -19,7 +19,8 @@ def mock_instagram_client():
     client = MagicMock()
     client.proxy = "http://current-proxy:8080"
     client.send_direct_message = AsyncMock(return_value=True)
-    client.login = AsyncMock(return_value=True)
+    # login() тепер повертає рядок, а не bool
+    client.login = AsyncMock(return_value="success")
     return client
 
 
@@ -78,7 +79,6 @@ def mock_notification_service():
     return service
 
 
-# Оновлена фікстура mock_lead_repository
 @pytest.fixture
 def mock_lead_repository():
     repository = MagicMock()
@@ -100,12 +100,11 @@ def mock_lead_repository():
     return repository
 
 
-# Оновіть існуючу фікстуру outreach_engine
 @pytest.fixture
 def outreach_engine(
     mock_instagram_client,
     mock_sheets_client,
-    mock_lead_repository,  # <--- Додано
+    mock_lead_repository,
     mock_warmup_manager,
     mock_proxy_rotator,
     mock_pause_manager,
@@ -121,7 +120,7 @@ def outreach_engine(
         engine = OutreachEngine(
             instagram_client=mock_instagram_client,
             sheets_client=mock_sheets_client,
-            lead_repository=mock_lead_repository,  # <--- Додано
+            lead_repository=mock_lead_repository,
             warmup_manager=mock_warmup_manager,
             proxy_rotator=mock_proxy_rotator,
             pause_manager=mock_pause_manager,
@@ -183,7 +182,6 @@ class TestOutreachEngineHelpers:
 
         assert outreach_engine.state == "blocked"
         outreach_engine.pause_manager.trigger_pause.assert_called_with("Spam")
-        # Змінено sheets_client на lead_repository
         outreach_engine.lead_repository.update_contact_status.assert_called_with(
             2, "Failed", "2023-10-01T12:00:00Z"
         )
@@ -230,7 +228,6 @@ class TestOutreachEngineRunBatch:
         assert result["remaining"] == 0
         assert outreach_engine.state == "idle"
 
-        # Змінено sheets_client на lead_repository
         assert outreach_engine.lead_repository.update_contact_status.call_count == 2
         assert outreach_engine.instagram_client.send_direct_message.call_count == 2
         assert outreach_engine.proxy_rotator.increment_message_count.call_count == 2
@@ -244,7 +241,6 @@ class TestOutreachEngineRunBatch:
 
         assert result["sent"] == 2
         assert outreach_engine.instagram_client.send_direct_message.call_count == 0
-        # Змінено sheets_client на lead_repository
         assert outreach_engine.lead_repository.update_contact_status.call_count == 2
 
     @pytest.mark.asyncio
@@ -281,20 +277,16 @@ class TestOutreachEngineRunBatch:
         self, mock_typing, mock_delay, outreach_engine
     ):
         """LoginRequired should attempt re-login and continue if successful."""
-        # 1. Start batch (login succeeds)
-        # 2. First message throws LoginRequired
-        # 3. Engine calls login again (succeeds)
-        # 4. Second message succeeds
         outreach_engine.instagram_client.send_direct_message.side_effect = [
             LoginRequired("Token expired"),
             True,
         ]
-        outreach_engine.instagram_client.login.return_value = True
+        # login() повертає рядки: перший виклик (початок батчу) — "success",
+        # другий виклик (re-login після LoginRequired) — "success"
+        outreach_engine.instagram_client.login.side_effect = ["success", "success"]
 
         result = await outreach_engine.run_batch()
 
-        # Login is called twice: once at the very beginning of the batch,
-        # and once during the recovery process.
         assert outreach_engine.instagram_client.login.call_count == 2
         assert result["failed"] == 1  # The one that triggered LoginRequired failed
         assert result["sent"] == 1  # The second one succeeded
@@ -307,9 +299,9 @@ class TestOutreachEngineRunBatch:
         self, mock_typing, mock_delay, outreach_engine
     ):
         """LoginRequired should block engine if re-login fails."""
-        # We want the initial login check to pass, so the engine starts sending.
-        # But when the first message throws LoginRequired, the RE-LOGIN attempt should fail.
-        outreach_engine.instagram_client.login.side_effect = [True, False]
+        # Перший виклик (початок батчу) — "success" (батч стартує нормально).
+        # Другий виклик (re-login після LoginRequired) — "error" (блокуємо).
+        outreach_engine.instagram_client.login.side_effect = ["success", "error"]
         outreach_engine.instagram_client.send_direct_message.side_effect = LoginRequired(
             "Token expired"
         )

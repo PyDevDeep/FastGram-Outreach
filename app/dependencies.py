@@ -20,6 +20,11 @@ from app.services.warmup_manager import WarmupManager
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 settings = get_settings()
 
+# Синглтон OutreachEngine на рівні модуля.
+# lru_cache + Depends несумісні: FastAPI не передає Depends-аргументи
+# в lru_cache-функцію при виклику поза DI-контекстом (наприклад, у lifespan).
+_outreach_engine: OutreachEngine | None = None
+
 
 async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
     """Перевірка X-API-Key з заголовків."""
@@ -64,7 +69,6 @@ def get_notification_service() -> NotificationService:
     return NotificationService()
 
 
-@lru_cache
 def get_outreach_engine(
     instagram_client: InstagramClient = Depends(get_instagram_client),
     sheets_client: GoogleSheetsClient = Depends(get_sheets_client),
@@ -74,15 +78,38 @@ def get_outreach_engine(
     pause_manager: PauseManager = Depends(get_pause_manager),
     notification_service: NotificationService = Depends(get_notification_service),
 ) -> OutreachEngine:
-    return OutreachEngine(
-        instagram_client,
-        sheets_client,
-        lead_repository=lead_repository,
-        warmup_manager=warmup_manager,
-        proxy_rotator=proxy_rotator,
-        pause_manager=pause_manager,
-        notification_service=notification_service,
-    )
+    """
+    FastAPI dependency — повертає синглтон OutreachEngine.
+    Перший виклик ініціалізує екземпляр і зберігає його в _outreach_engine.
+    Подальші виклики (в тому числі з lifespan через get_outreach_engine_instance)
+    повертають той самий об'єкт.
+    """
+    global _outreach_engine
+    if _outreach_engine is None:
+        _outreach_engine = OutreachEngine(
+            instagram_client,
+            sheets_client,
+            lead_repository=lead_repository,
+            warmup_manager=warmup_manager,
+            proxy_rotator=proxy_rotator,
+            pause_manager=pause_manager,
+            notification_service=notification_service,
+        )
+    return _outreach_engine
+
+
+def get_outreach_engine_instance() -> OutreachEngine:
+    """
+    Повертає вже створений синглтон OutreachEngine поза DI-контекстом
+    (наприклад, у lifespan або фонових тасках).
+    Викидає RuntimeError якщо викликати до першого HTTP-запиту.
+    """
+    if _outreach_engine is None:
+        raise RuntimeError(
+            "OutreachEngine is not initialized yet. "
+            "Ensure at least one request has been processed before calling this."
+        )
+    return _outreach_engine
 
 
 @lru_cache

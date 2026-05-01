@@ -207,7 +207,7 @@ class OutreachEngine:
 
             except LoginRequired as e:
                 logger.warning(f"Session expired/invalidated: {e}. Attempting re-login...")
-                if await self.instagram_client.login():
+                if await self.instagram_client.login() == "success":
                     logger.info(
                         "Re-login successful. State remains running. Moving to next contact."
                     )
