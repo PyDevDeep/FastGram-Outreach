@@ -122,9 +122,18 @@ class InstagramClient:
         self.client.delay_range = [5, 15]
         self._session_lock = asyncio.Lock()
 
-        # --- ЖОРСТКЕ ПЕРЕХОПЛЕННЯ CHALLENGE ---
-        # Забороняємо бібліотеці просити код у консолі. Вона має просто падати з помилкою.
+        # --- ДОДАНО: Сховище для коду з UI ---
+        self._injected_code: str | None = None
+
+        # --- РОЗУМНЕ ПЕРЕХОПЛЕННЯ CHALLENGE ---
         def _challenge_handler(username: str, choice: Any | None = None) -> str:
+            if self._injected_code:
+                code = self._injected_code
+                self._injected_code = None  # Використовуємо лише один раз
+                logger.info(f"Injecting UI verification code for {username}")
+                return code
+
+            # Якщо коду немає (перша спроба логіну) - викидаємо помилку для UI
             return self._force_challenge_fail()
 
         self.client.challenge_code_handler = _challenge_handler
@@ -273,10 +282,9 @@ class InstagramClient:
             return False
 
     async def login(self, verification_code: str | None = None) -> str:
-        """Повертає: 'success', 'challenge_required', 'error'"""
         if not await self._verify_proxy():
             return "error"
-
+        self._injected_code = verification_code
         # Якщо є збережена сесія і ми не намагаємося передати код 2FA
         if self.session_path.exists() and not verification_code:
             try:
