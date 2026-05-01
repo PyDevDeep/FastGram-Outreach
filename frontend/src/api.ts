@@ -33,3 +33,14 @@ export const syncLeads = async () => {
   const response = await apiClient.post("/leads/sync");
   return response.data;
 };
+export const checkAuthStatus = async () => {
+  const response = await apiClient.get("/auth/status");
+  return response.data;
+};
+
+export const triggerLogin = async (code?: string) => {
+  const response = await apiClient.post("/auth/login", {
+    verification_code: code,
+  });
+  return response.data;
+};

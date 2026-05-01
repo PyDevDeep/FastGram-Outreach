@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getStats, syncLeads } from "./api";
-import { Activity, RefreshCw } from "lucide-react"; // Додано RefreshCw
+import { getStats, syncLeads, checkAuthStatus, triggerLogin } from "./api";
+import { Activity, RefreshCw, ShieldAlert, KeyRound } from "lucide-react";
 import LeadsTable from "./components/LeadsTable";
 
 interface DashboardStats {
@@ -11,11 +11,18 @@ interface DashboardStats {
   total: number;
 }
 
-function App() {
+export default function App() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0); // Ключ для примусового рендеру таблиці
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Auth States
+  const [isAuthValid, setIsAuthValid] = useState<boolean | null>(null);
+  const [isChallenge, setIsChallenge] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const fetchStats = () => {
     getStats()
@@ -24,29 +31,157 @@ function App() {
         setError(null);
       })
       .catch((err) => {
-        console.error("API Error:", err);
         setError(err.message || "Помилка підключення до API");
       });
   };
+  useEffect(() => {
+    // Переносимо логіку ВСЕРЕДИНУ useEffect
+    const verifySession = async () => {
+      try {
+        const res = await checkAuthStatus();
+        setIsAuthValid(res.is_valid);
+        if (!res.is_valid) {
+          setAuthError(res.message || "Сесія невалідна. Потрібен логін.");
+        }
+      } catch (err) {
+        setIsAuthValid(false);
+        setAuthError(
+          err instanceof Error ? err.message : "Помилка зв'язку з бекендом.",
+        );
+      }
+    };
+
+    verifySession();
+  }, []);
 
   useEffect(() => {
-    fetchStats();
-  }, [refreshKey]); // Оновлюємо статистику при зміні ключа
+    if (isAuthValid) {
+      fetchStats();
+    }
+  }, [isAuthValid, refreshKey]);
+
+  const handleLogin = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const res = await triggerLogin(
+        verificationCode ? verificationCode : undefined,
+      );
+
+      if (res.status === "success") {
+        setIsAuthValid(true);
+        setIsChallenge(false);
+        setVerificationCode("");
+      } else if (res.status === "challenge_required") {
+        setIsChallenge(true);
+        setAuthError(
+          "Instagram вимагає підтвердження. Введи код з SMS/Пошти/Додатка.",
+        );
+      }
+    } catch (err) {
+      const e = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+      setAuthError(
+        e.response?.data?.detail || e.message || "Помилка авторизації",
+      );
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const handleSync = async () => {
     setIsSyncing(true);
     try {
       await syncLeads();
-      setRefreshKey((prev) => prev + 1); // Тригер оновлення таблиці і статистики
+      setRefreshKey((prev) => prev + 1);
     } catch (err) {
-      console.error("Sync failed:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      alert("Помилка синхронізації: " + errorMessage);
+      const e = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+      setAuthError(
+        e.response?.data?.detail || e.message || "Помилка синхронізації:",
+      );
     } finally {
-      setIsSyncing(false);
+      setAuthLoading(false);
     }
   };
 
+  // --- ЕКРАН ЗАВАНТАЖЕННЯ ---
+  if (isAuthValid === null) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <div className="animate-pulse flex items-center gap-2 text-xl">
+          <Activity className="w-6 h-6 text-blue-500" /> Перевірка сесії
+          Instagram...
+        </div>
+      </div>
+    );
+  }
+
+  // --- ЕКРАН АВТОРИЗАЦІЇ / 2FA ---
+  if (isAuthValid === false) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-gray-800 border border-gray-700 p-8 rounded-xl w-full max-w-md shadow-2xl">
+          <div className="flex justify-center mb-6">
+            <ShieldAlert className="w-16 h-16 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-white text-center mb-2">
+            Сесія не активна
+          </h2>
+          <p className="text-gray-400 text-center mb-6 text-sm">
+            FastGram не може відправляти повідомлення. Потрібна повторна
+            авторизація в Instagram.
+          </p>
+
+          {authError && (
+            <div className="bg-red-900/30 border border-red-800 text-red-300 p-3 rounded mb-6 text-sm">
+              {authError}
+            </div>
+          )}
+
+          {isChallenge && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Код верифікації (2FA)
+              </label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type="text"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  placeholder="123456"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg py-2.5 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleLogin}
+            disabled={authLoading}
+            className={`w-full py-3 rounded-lg font-bold transition-colors ${
+              authLoading
+                ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+            }`}
+          >
+            {authLoading
+              ? "Обробка..."
+              : isChallenge
+                ? "Відправити код"
+                : "Ініціювати Логін"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- ЕКРАН ДАШБОРДУ (якщо isAuthValid === true) ---
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <div className="max-w-6xl mx-auto">
@@ -56,7 +191,6 @@ function App() {
             <h1 className="text-3xl font-bold">FastGram Dashboard</h1>
           </div>
 
-          {/* Кнопка синхронізації */}
           <button
             onClick={handleSync}
             disabled={isSyncing}
@@ -70,11 +204,11 @@ function App() {
         </div>
 
         {error ? (
-          <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg">
-            Критична помилка: {error}. Перевір F12 -&gt; Network.
+          <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg mb-8">
+            {error}
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-5 gap-4 mb-8">
             {Object.entries(stats).map(([key, value]) => (
               <div
                 key={key}
@@ -87,15 +221,10 @@ function App() {
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-gray-500 animate-pulse">З'єднання з API...</div>
-        )}
+        ) : null}
 
-        {/* Передаємо refreshKey, щоб таблиця оновлювалась після синку */}
-        {!error && <LeadsTable key={refreshKey} />}
+        <LeadsTable key={refreshKey} />
       </div>
     </div>
   );
 }
-
-export default App;
