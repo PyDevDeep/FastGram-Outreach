@@ -29,7 +29,7 @@ wheels/
 *.swp
 *.swo
 *~
-
+!frontend/src/lib/
 # Environment
 .env
 .env.local
