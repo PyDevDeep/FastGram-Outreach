@@ -1,4 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_KEY = import.meta.env.VITE_API_KEY || "";
 
 export async function apiFetch<T>(
   path: string,
@@ -8,6 +9,7 @@ export async function apiFetch<T>(
 
   const defaultHeaders: HeadersInit = {
     "Content-Type": "application/json",
+    ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
   };
 
   const config: RequestInit = {
