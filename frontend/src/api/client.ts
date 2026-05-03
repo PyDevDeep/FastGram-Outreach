@@ -1,11 +1,20 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
+const BASE_URL = rawBaseUrl.endsWith("/")
+  ? rawBaseUrl.slice(0, -1)
+  : rawBaseUrl;
 const API_KEY = import.meta.env.VITE_API_KEY || "";
 
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const url = `${BASE_URL}${path}`;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+  // Запобігання генерації дубльованого /api/api/
+  const url =
+    BASE_URL.endsWith("/api") && cleanPath.startsWith("/api")
+      ? `${BASE_URL}${cleanPath.slice(4)}`
+      : `${BASE_URL}${cleanPath}`;
 
   const defaultHeaders: HeadersInit = {
     "Content-Type": "application/json",
