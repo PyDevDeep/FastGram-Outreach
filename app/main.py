@@ -64,6 +64,11 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(leads.router)
 
+    from app.routers import config, system
+
+    app.include_router(config.router)
+    app.include_router(system.router)
+
     return app
 
 
