@@ -24,7 +24,7 @@ class SystemConfig(BaseModel):
     work_hours_end: int = 21
 
 
-@router.get("/", response_model=SystemConfig)
+@router.get("", response_model=SystemConfig)
 async def get_config() -> SystemConfig:
     exists = await aiofiles.os.path.exists(CONFIG_FILE)
     if not exists:
@@ -34,7 +34,7 @@ async def get_config() -> SystemConfig:
         return SystemConfig(**json.loads(content))
 
 
-@router.post("/", response_model=SystemConfig)
+@router.post("", response_model=SystemConfig)
 async def save_config(config: SystemConfig) -> SystemConfig:
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(CONFIG_FILE, "w", encoding="utf-8") as f:

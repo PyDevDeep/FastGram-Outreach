@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db_session
 from app.dependencies import get_sheets_client, verify_api_key
 from app.models.lead import Lead
+from app.repositories.lead_repository import LeadRepository
 from app.services.sheets_client import GoogleSheetsClient
 
 # Захищаємо роутер твоїм API-ключем
@@ -134,3 +136,24 @@ async def sync_leads_from_sheets(
 
     await session.commit()
     return {"status": "success", "synced": success_count, "errors": error_count}
+
+
+class LeadStatusUpdate(BaseModel):
+    status: str
+
+
+@router.patch("/{lead_id}")
+async def update_lead_status_endpoint(
+    lead_id: int,
+    payload: LeadStatusUpdate,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Ручне оновлення статусу ліда з UI."""
+    repo = LeadRepository(session)
+    timestamp = datetime.now(UTC).isoformat()
+
+    success = await repo.update_contact_status(lead_id, payload.status, timestamp)
+    if not success:
+        return {"error": "Lead not found or update failed"}
+
+    return {"id": lead_id, "status": payload.status}

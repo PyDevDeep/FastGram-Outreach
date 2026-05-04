@@ -22,9 +22,9 @@ export function ActivityLog() {
           <EmptyState message="Немає подій" />
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto relative">
           <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 sticky top-0 shadow-sm">
+            <thead className="bg-card sticky top-0 shadow-sm z-10 border-b border-border">
               <tr>
                 <th className="px-5 py-3 font-medium text-muted-foreground">
                   Час
