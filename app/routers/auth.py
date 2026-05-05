@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore
 from pydantic import BaseModel
 
@@ -16,6 +18,7 @@ class AuthStatusResponse(BaseModel):
     is_valid: bool
     proxy_alive: bool
     message: str
+    session_created_at: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -56,12 +59,22 @@ async def trigger_login(
 async def check_auth_status(
     client: InstagramClient = Depends(get_instagram_client),
 ) -> AuthStatusResponse:
+    session_file = client.session_path
+    created_at = None
+    if session_file.exists():
+        mtime = session_file.stat().st_mtime
+        # Додаємо tz=timezone.utc для datetime
+        created_at = datetime.fromtimestamp(mtime, tz=UTC).isoformat()
     # ==========================================
     # MOCK MODE: АКТИВНО (24h COOLDOWN)
     # ==========================================
     logger.info("MOCK MODE: /status triggered. Returning fake valid session.")
     return AuthStatusResponse(
-        is_valid=True, proxy_alive=True, message="MOCK: Session is valid and ready."
+        is_valid=True,
+        proxy_alive=True,
+        message="MOCK: Session is valid and ready.",
+        # Додаємо tz=timezone.utc для datetime.now()
+        session_created_at=created_at or datetime.now(tz=UTC).isoformat(),
     )
 
     # ==========================================

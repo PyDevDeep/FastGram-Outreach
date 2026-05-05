@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import DashboardPage from "@/pages/DashboardPage";
 import LeadsPage from "@/pages/LeadsPage";
 import ConfigPage from "@/pages/ConfigPage";
+import SessionPage from "@/pages/SessionPage";
 
 export const router = createBrowserRouter([
   {
@@ -20,6 +21,14 @@ export const router = createBrowserRouter([
       {
         path: "config",
         element: <ConfigPage />,
+      },
+      {
+        path: "config",
+        element: <ConfigPage />,
+      },
+      {
+        path: "session",
+        element: <SessionPage />,
       },
     ],
   },

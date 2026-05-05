@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Settings, Key } from "lucide-react";
 import { useUIStore } from "@/store/uiStore";
 
 export function Sidebar() {
@@ -12,6 +12,7 @@ export function Sidebar() {
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     { path: "/leads", label: "Ліди", icon: <Users className="w-5 h-5" /> },
+    { path: "/session", label: "Сесія", icon: <Key className="w-5 h-5" /> },
     {
       path: "/config",
       label: "Налаштування",
