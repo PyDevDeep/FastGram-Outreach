@@ -38,7 +38,7 @@ class ReplyTracker:
         ]
 
     def classify_reply(self, message_text: str) -> str:
-        """Визначення тегу на основі ключових слів."""
+        """Determine tag based on keywords."""
         if not message_text:
             return "Unclear"
 
@@ -54,7 +54,7 @@ class ReplyTracker:
         return "Unclear"
 
     async def check_replies(self) -> list[dict[str, Any]]:
-        """Перевіряє inbox на нові відповіді від контактів зі статусом Sent."""
+        """Checks inbox for new replies from contacts with Sent status."""
         sent_contacts = await self.sheets_client.get_sent_contacts()
         if not sent_contacts:
             logger.info("No sent contacts found. Skipping reply check.")
@@ -64,7 +64,7 @@ class ReplyTracker:
             str(c.get("Instagram User ID")): c for c in sent_contacts if c.get("Instagram User ID")
         }
 
-        # Кастуємо клієнт до Any, щоб Pylance Strict Mode ігнорував перевірку його атрибутів
+        # Cast client to Any so Pylance Strict Mode ignores its attribute check
         ig_any: Any = self.ig_client
         threads: list[Any] = await ig_any.get_direct_inbox(limit=20)
         new_replies: list[dict[str, Any]] = []
@@ -73,7 +73,7 @@ class ReplyTracker:
         bot_id = str(getattr(client_api, "user_id", ""))
 
         for t in threads:
-            # Явне приведення елемента ітерації до Any вирішує reportUnknownArgumentType
+            # Explicit cast of iteration element to Any solves reportUnknownArgumentType
             thread: Any = t
             messages: list[Any] = getattr(thread, "messages", [])
             if not messages:
@@ -100,7 +100,7 @@ class ReplyTracker:
         return new_replies
 
     async def process_and_tag(self) -> dict[str, int]:
-        """Оркестрація перевірки та запису результатів у Sheets."""
+        """Orchestration of checking and recording results in Sheets."""
         logger.info("Starting reply polling cycle")
         replies = await self.check_replies()
 

@@ -43,7 +43,7 @@ class OutreachEngine:
         self._state = "idle"
         self.sent_today = 0
         self._current_date = datetime.now(UTC).date()
-        # ДОДАНО: Event для правильного очікування замість sleep
+        # ADDED: Event for proper waiting instead of sleep
         self._resume_event = asyncio.Event()
         self._resume_event.set()
 
@@ -79,7 +79,7 @@ class OutreachEngine:
     ) -> int:
         self.state = "blocked"
         self.pause_manager.trigger_pause(reason)
-        # Змінено на запис у БД замість Sheets
+        # Changed to DB write instead of Sheets
         await self.lead_repository.update_contact_status(lead_id, "Failed", timestamp)
         await self.notification_service.send_block_alert(reason, sent_count, username)
         return 1
@@ -87,7 +87,7 @@ class OutreachEngine:
     async def run_batch(
         self, batch_size: int | None = None, dry_run: bool = False
     ) -> dict[str, Any]:
-        """Обробка черги повідомлень із затримками, лімітами та обробкою помилок."""
+        """Process message queue with delays, limits, and error handling."""
         if self.state != "idle":
             logger.warning(f"Cannot start new batch. Engine is currently in '{self.state}' state.")
             return {"sent": 0, "failed": 0, "remaining": 0, "state": self.state}
@@ -133,7 +133,7 @@ class OutreachEngine:
 
         limit = batch_size or self.settings.daily_message_limit
 
-        # --- Читаємо лідів з БД ---
+        # --- Read leads from DB ---
         pending_contacts = await self.lead_repository.get_pending_contacts(limit=limit)
         logger.info(f"Fetched {len(pending_contacts)} pending contacts from DB. Dry run: {dry_run}")
 
@@ -157,7 +157,7 @@ class OutreachEngine:
                 logger.warning(f"Daily message limit reached ({limit}). Halting batch.")
                 break
 
-            # --- Звертаємося до атрибутів моделі Lead ---
+            # --- Accessing Lead model attributes ---
             lead_id = contact.id
             username = contact.instagram_username
             user_id = contact.instagram_user_id

@@ -52,7 +52,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # На етапі деплою замінити на конкретний домен
+        allow_origins=["*"],  # Replace with a specific domain during deployment
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

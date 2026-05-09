@@ -12,8 +12,8 @@ router = APIRouter(prefix="/tracking", tags=["Tracking"], dependencies=[Depends(
 @router.get("/check-replies")
 async def check_replies(tracker: ReplyTracker = Depends(get_reply_tracker)) -> dict[str, Any]:
     """
-    Запускає перевірку inbox, класифікує нові відповіді
-    та оновлює статуси в Google Sheets.
+    Runs inbox check, classifies new replies
+    and updates statuses in Google Sheets.
     """
     stats = await tracker.process_and_tag()
     return stats
@@ -28,7 +28,7 @@ async def get_leads(
     offset: int = Query(0, ge=0),
     sheets: GoogleSheetsClient = Depends(get_sheets_client),
 ) -> list[dict[str, Any]]:
-    """Список всіх лідів з фільтрами."""
+    """List of all leads with filters."""
     return await sheets.get_all_contacts(status=status, limit=limit, offset=offset)
 
 
@@ -38,7 +38,7 @@ async def update_lead_tag(
     tag: str = Body(..., embed=True),
     sheets: GoogleSheetsClient = Depends(get_sheets_client),
 ) -> dict[str, Any]:
-    """Ручне оновлення тегу ліда."""
+    """Manual update of lead tag."""
     updated = await sheets.update_contact_tag(lead_id, tag)
     if not updated:
         raise HTTPException(status_code=404, detail="Lead not found")

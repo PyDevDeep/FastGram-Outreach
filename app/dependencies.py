@@ -20,14 +20,14 @@ from app.services.warmup_manager import WarmupManager
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 settings = get_settings()
 
-# Синглтон OutreachEngine на рівні модуля.
-# lru_cache + Depends несумісні: FastAPI не передає Depends-аргументи
-# в lru_cache-функцію при виклику поза DI-контекстом (наприклад, у lifespan).
+# Singleton OutreachEngine at the module level.
+# lru_cache + Depends are incompatible: FastAPI doesn't pass Depends arguments
+# to lru_cache function when called outside DI context (e.g. in lifespan).
 _outreach_engine: OutreachEngine | None = None
 
 
 async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
-    """Перевірка X-API-Key з заголовків."""
+    """Check X-API-Key from headers."""
     if not api_key or api_key != settings.api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing API Key"
@@ -79,10 +79,10 @@ def get_outreach_engine(
     notification_service: NotificationService = Depends(get_notification_service),
 ) -> OutreachEngine:
     """
-    FastAPI dependency — повертає синглтон OutreachEngine.
-    Перший виклик ініціалізує екземпляр і зберігає його в _outreach_engine.
-    Подальші виклики (в тому числі з lifespan через get_outreach_engine_instance)
-    повертають той самий об'єкт.
+    FastAPI dependency — returns the OutreachEngine singleton.
+    First call initializes the instance and stores it in _outreach_engine.
+    Subsequent calls (including from lifespan via get_outreach_engine_instance)
+    return the same object.
     """
     global _outreach_engine
     if _outreach_engine is None:
@@ -100,9 +100,9 @@ def get_outreach_engine(
 
 def get_outreach_engine_instance() -> OutreachEngine:
     """
-    Повертає вже створений синглтон OutreachEngine поза DI-контекстом
-    (наприклад, у lifespan або фонових тасках).
-    Викидає RuntimeError якщо викликати до першого HTTP-запиту.
+    Returns the already created OutreachEngine singleton outside DI context
+    (e.g., in lifespan or background tasks).
+    Raises RuntimeError if called before the first HTTP request.
     """
     if _outreach_engine is None:
         raise RuntimeError(

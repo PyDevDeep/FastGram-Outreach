@@ -13,7 +13,7 @@ from app.models.lead import Lead
 from app.repositories.lead_repository import LeadRepository
 from app.services.sheets_client import GoogleSheetsClient
 
-# Захищаємо роутер твоїм API-ключем
+# Protect router with your API key
 router = APIRouter(prefix="/api/leads", tags=["Dashboard"], dependencies=[Depends(verify_api_key)])
 
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/leads", tags=["Dashboard"], dependencies=[Depend
 async def get_all_leads(
     limit: int = 100, offset: int = 0, session: AsyncSession = Depends(get_db_session)
 ) -> list[dict[str, Any]]:
-    """Отримання списку лідів для таблиці на фронтенді."""
+    """Get the list of leads for the frontend table."""
     stmt = select(Lead).order_by(Lead.updated_at.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     leads = result.scalars().all()
@@ -43,7 +43,7 @@ async def get_all_leads(
 
 @router.get("/stats")
 async def get_dashboard_stats(session: AsyncSession = Depends(get_db_session)) -> dict[str, int]:
-    """Агрегація статистики для дашборду."""
+    """Aggregation of statistics for the dashboard."""
     stmt = select(Lead.status, func.count(Lead.id)).group_by(Lead.status)
     result = await session.execute(stmt)
 
@@ -76,7 +76,7 @@ async def sync_leads_from_sheets(
     session: AsyncSession = Depends(get_db_session),
     sheets_client: GoogleSheetsClient = Depends(get_sheets_client),
 ) -> dict[str, Any]:
-    """Синхронізує лідів з Google Sheets у PostgreSQL."""
+    """Synchronizes leads from Google Sheets into PostgreSQL."""
     contacts = await sheets_client.get_all_contacts(limit=10000)
     if not contacts:
         return {
@@ -116,7 +116,7 @@ async def sync_leads_from_sheets(
             reply_timestamp=reply_timestamp,
         )
 
-        # UPSERT: Оновлюємо існуючі записи (включаючи дати)
+        # UPSERT: Update existing records (including dates)
         stmt = stmt.on_conflict_do_update(
             index_elements=["instagram_user_id"],
             set_={
@@ -148,7 +148,7 @@ async def update_lead_status_endpoint(
     payload: LeadStatusUpdate,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
-    """Ручне оновлення статусу ліда з UI."""
+    """Manual update of lead status from UI."""
     repo = LeadRepository(session)
     timestamp = datetime.now(UTC).isoformat()
 

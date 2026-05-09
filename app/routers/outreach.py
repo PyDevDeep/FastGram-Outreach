@@ -84,7 +84,7 @@ async def get_outreach_status(
 
 @router.post("/warmup/increment")
 async def increment_warmup(manager: WarmupManager = Depends(get_warmup_manager)) -> dict[str, Any]:
-    """Перехід на наступний день прогріву (викликається через n8n щодня о 00:01)."""
+    """Proceed to the next warmup day (called via n8n daily at 00:01)."""
     if not manager.is_warmup_active():
         return {
             "status": "completed",
@@ -105,14 +105,14 @@ async def increment_warmup(manager: WarmupManager = Depends(get_warmup_manager))
 
 @router.post("/warmup/reset")
 async def reset_warmup(manager: WarmupManager = Depends(get_warmup_manager)) -> dict[str, str]:
-    """Примусове скидання прогріву до 1-го дня (використовувати при бані або зміні акаунта)."""
+    """Force reset warmup to Day 1 (use when banned or changing accounts)."""
     manager.reset_warmup()
     return {"status": "reset", "message": "Warm-up reset to Day 1 (Limit: 5)"}
 
 
 @router.get("/warmup/status")
 async def get_warmup_status(manager: WarmupManager = Depends(get_warmup_manager)) -> dict[str, Any]:
-    """Отримання поточного статусу прогріву."""
+    """Get the current warmup status."""
     return {
         "day": manager.get_current_day(),
         "daily_limit": manager.get_current_daily_limit(),
@@ -122,12 +122,12 @@ async def get_warmup_status(manager: WarmupManager = Depends(get_warmup_manager)
 
 @router.post("/resume-pause")
 async def manual_resume_pause(manager: PauseManager = Depends(get_pause_manager)) -> dict[str, str]:
-    """Примусове зняття 24-годинної паузи (використовувати після ручного розблокування акаунта)."""
+    """Force lift the 24-hour pause (use after manual account unblock)."""
     if not manager.is_paused():
         return {"status": "ignored", "message": "System is not currently paused."}
 
     manager.manual_resume()
-    # Якщо engine був у стані 'blocked', переводимо його в 'idle' для можливості нових запусків
+    # If engine was in 'blocked' state, change it to 'idle' to allow new runs
     engine = get_outreach_engine()
     if engine.state == "blocked":
         engine.state = "idle"

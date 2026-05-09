@@ -8,20 +8,20 @@ logger = setup_logger("delay_utils")
 
 async def random_delay(min_seconds: float, max_seconds: float, sigma_spread: float = 6.0) -> float:
     """
-    Асинхронна пауза з нормальним розподілом (Gaussian).
-    Більшість значень будуть групуватися ближче до середнього.
+    Asynchronous pause with normal distribution (Gaussian).
+    Most values will be clustered around the mean.
     """
     if min_seconds >= max_seconds:
         delay = float(min_seconds)
     else:
         mean = (min_seconds + max_seconds) / 2.0
-        # Розрахунок стандартного відхилення на основі заданого розмаху сигм
+        # Calculate standard deviation based on the given sigma spread
         std_dev = (max_seconds - min_seconds) / sigma_spread
 
         secure_random = secrets.SystemRandom()
         delay = secure_random.gauss(mean, std_dev)
 
-        # Жорстко обрізаємо аномалії, що вийшли за межі
+        # Hard clip anomalies that fall outside the boundaries
         delay = max(min_seconds, min(max_seconds, delay))
 
     logger.info(f"Human-like delay: sleeping for {delay:.2f} seconds")
@@ -36,9 +36,9 @@ async def typing_simulation_delay(
     noise_max: float = 1.1,
 ) -> float:
     """
-    Імітація набору тексту.
-    Додає випадковий шум до розрахункового часу (за замовчуванням +/- 10%).
-    для відповідності критеріям (28-35 сек для 100 символів).
+    Typing simulation.
+    Adds random noise to the calculated time (default +/- 10%).
+    to match the criteria (28-35 sec for 100 characters).
     """
     if message_length <= 0:
         return 0.0

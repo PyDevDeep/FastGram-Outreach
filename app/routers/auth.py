@@ -35,24 +35,24 @@ async def trigger_login(
     req: LoginRequest, client: InstagramClient = Depends(get_instagram_client)
 ) -> LoginResponse:
     # ==========================================
-    # MOCK MODE: АКТИВНО (24h COOLDOWN)
+    # MOCK MODE: ACTIVE (24h COOLDOWN)
     # ==========================================
     logger.info("MOCK MODE: /login triggered. Returning fake success.")
-    return LoginResponse(status="success", message="MOCK: Успішна авторизація.")
+    return LoginResponse(status="success", message="MOCK: Successful authorization.")
 
     # ==========================================
-    # ORIGINAL CODE (ЗАКОМЕНТОВАНО)
+    # ORIGINAL CODE (COMMENTED OUT)
     # ==========================================
     # status = await client.login(verification_code=req.verification_code)
     #
     # if status == "success":
-    #     return LoginResponse(status="success", message="Успішна авторизація.")
+    #     return LoginResponse(status="success", message="Successful authorization.")
     # elif status == "challenge_required":
     #     return LoginResponse(
-    #         status="challenge_required", message="Потрібен код 2FA (перевірте SMS/App)."
+    #         status="challenge_required", message="2FA code required (check SMS/App)."
     #     )
     # else:
-    #     raise HTTPException(status_code=401, detail="Помилка авторизації. Перевірте логи.")
+    #     raise HTTPException(status_code=401, detail="Authorization error. Check logs.")
 
 
 @router.get("/status", response_model=AuthStatusResponse)
@@ -63,22 +63,22 @@ async def check_auth_status(
     created_at = None
     if session_file.exists():
         mtime = session_file.stat().st_mtime
-        # Додаємо tz=timezone.utc для datetime
+        # Add tz=timezone.utc for datetime
         created_at = datetime.fromtimestamp(mtime, tz=UTC).isoformat()
     # ==========================================
-    # MOCK MODE: АКТИВНО (24h COOLDOWN)
+    # MOCK MODE: ACTIVE (24h COOLDOWN)
     # ==========================================
     logger.info("MOCK MODE: /status triggered. Returning fake valid session.")
     return AuthStatusResponse(
         is_valid=True,
         proxy_alive=True,
         message="MOCK: Session is valid and ready.",
-        # Додаємо tz=timezone.utc для datetime.now()
+        # Add tz=timezone.utc for datetime.now()
         session_created_at=created_at or datetime.now(tz=UTC).isoformat(),
     )
 
     # ==========================================
-    # ORIGINAL CODE (ЗАКОМЕНТОВАНО)
+    # ORIGINAL CODE (COMMENTED OUT)
     # ==========================================
     # proxy_alive = client.is_proxy_alive
     # if not proxy_alive:

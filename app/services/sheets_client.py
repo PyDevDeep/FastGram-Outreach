@@ -30,13 +30,13 @@ class GoogleSheetsClient:
             raise RuntimeError("Database initialization failed") from e
 
     async def get_pending_contacts(self, sheet_name: str = "Contacts") -> list[dict[str, Any]]:
-        """Отримує всі контакти зі статусом Pending."""
+        """Gets all contacts with Pending status."""
 
         def _fetch() -> list[dict[str, Any]]:
             worksheet = self.sheet.worksheet(sheet_name)
             records: list[dict[str, Any]] = worksheet.get_all_records()
 
-            # gspread row index починається з 2 (через header)
+            # gspread row index starts with 2 (due to header)
             pending: list[dict[str, Any]] = []
             for i, row in enumerate(records):
                 if str(row.get("Status", "")).strip().lower() == "pending":
@@ -54,7 +54,7 @@ class GoogleSheetsClient:
     async def update_contact_status(
         self, row_index: int, status: str, timestamp: str, sheet_name: str = "Contacts"
     ) -> bool:
-        """Оновлює статус та час відправки для конкретного рядка."""
+        """Updates status and sent timestamp for a specific row."""
 
         def _update() -> None:
             worksheet = self.sheet.worksheet(sheet_name)
@@ -66,7 +66,7 @@ class GoogleSheetsClient:
             except ValueError as e:
                 raise ValueError("Required columns ('Status' or 'Sent Timestamp') not found") from e
 
-            # Батч-оновлення для мінімізації API квот
+            # Batch update to minimize API quotas
             worksheet.update_cells(
                 [
                     gspread.Cell(row=row_index, col=status_col, value=status),
@@ -83,7 +83,7 @@ class GoogleSheetsClient:
             return False
 
     async def get_sent_contacts(self, sheet_name: str = "Contacts") -> list[dict[str, Any]]:
-        """Отримує всі контакти зі статусом Sent (для трекінгу відповідей)."""
+        """Gets all contacts with Sent status (for reply tracking)."""
 
         def _fetch() -> list[dict[str, Any]]:
             worksheet = self.sheet.worksheet(sheet_name)
@@ -111,7 +111,7 @@ class GoogleSheetsClient:
         reply_timestamp: str,
         sheet_name: str = "Contacts",
     ) -> bool:
-        """Додавання даних про відповідь до рядка контакту."""
+        """Adds reply data to the contact row."""
 
         def _update() -> None:
             worksheet = self.sheet.worksheet(sheet_name)
@@ -125,7 +125,7 @@ class GoogleSheetsClient:
             except ValueError as e:
                 raise ValueError("Required reply columns not found in Sheets header") from e
 
-            # Батч-оновлення
+            # Batch update
             worksheet.update_cells(
                 [
                     gspread.Cell(row=row_index, col=status_col, value="Replied"),
@@ -150,7 +150,7 @@ class GoogleSheetsClient:
         offset: int = 0,
         sheet_name: str = "Contacts",
     ) -> list[dict[str, Any]]:
-        """Отримує список всіх лідів з можливістю фільтрації за статусом."""
+        """Gets a list of all leads with optional status filtering."""
 
         def _fetch() -> list[dict[str, Any]]:
             worksheet = self.sheet.worksheet(sheet_name)
@@ -175,7 +175,7 @@ class GoogleSheetsClient:
     async def update_contact_tag(
         self, lead_id: str, tag: str, sheet_name: str = "Contacts"
     ) -> dict[str, Any] | None:
-        """Оновлює тег для конкретного ліда (за Instagram User ID або Row ID)."""
+        """Updates tag for a specific lead (by Instagram User ID or Row ID)."""
 
         def _update() -> dict[str, Any] | None:
             worksheet = self.sheet.worksheet(sheet_name)
@@ -190,7 +190,7 @@ class GoogleSheetsClient:
             row_index = None
             target_row = None
             for i, row in enumerate(records):
-                # Підтримуємо пошук як за Instagram User ID, так і за Row ID (якщо він там є)
+                # Support search by both Instagram User ID and Row ID (if present)
                 if (
                     str(row.get("Instagram User ID", "")) == lead_id
                     or str(row.get("_row_index", "")) == lead_id

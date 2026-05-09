@@ -13,10 +13,10 @@ class NotificationService:
         self.settings = settings or get_settings()
 
     async def send_block_alert(self, reason: str, sent_count: int, username: str) -> None:
-        """Відправляє Push-сповіщення у n8n про блокування акаунта."""
+        """Sends Push notification to n8n about account block."""
         webhook_url = self.settings.n8n_webhook_url
         if not webhook_url:
-            logger.warning("N8N_WEBHOOK_URL не налаштовано. Алерт про блокування проігноровано.")
+            logger.warning("N8N_WEBHOOK_URL not configured. Block alert ignored.")
             return
 
         payload = {

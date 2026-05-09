@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     polling_interval_minutes: int = 30
     session_encryption_key: str = ""
     instagram_locale: str = "uk_UA"
-    timezone_offset: int = 10800  # секунди від UTC, UTC+3 = 3*3600
+    timezone_offset: int = 10800  # seconds from UTC, UTC+3 = 3*3600
 
     google_sheets_id: str = ""
     google_application_credentials: str = "/app/credentials.json"

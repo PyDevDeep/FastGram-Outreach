@@ -16,11 +16,11 @@ class PauseManager:
             "resume_at": None,
             "reason": None,
         }
-        # Явно вказуємо тип для словника стану
+        # Explicitly specify type for the state dict
         self._state: dict[str, Any] = self._load_state()
 
     def _load_state(self) -> dict[str, Any]:
-        """Завантажує стан з файлу або створює дефолтний."""
+        """Loads state from file or creates a default one."""
         if not self.state_file.exists():
             self._save_state(self.default_state)
             return self.default_state.copy()
@@ -29,21 +29,21 @@ class PauseManager:
             with open(self.state_file, encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    # Використовуємо cast для повного визначення типів вмісту словника
+                    # Use cast to fully specify the dictionary content types
                     return cast(dict[str, Any], data)
                 return self.default_state.copy()
         except (OSError, json.JSONDecodeError) as e:
-            logger.error(f"Помилка зчитування pause_state.json: {e}. Скидання стану.")
+            logger.error(f"Error reading pause_state.json: {e}. Resetting state.")
             return self.default_state.copy()
 
     def _save_state(self, state: dict[str, Any]) -> None:
-        """Зберігає поточний стан у JSON."""
+        """Saves the current state to JSON."""
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.state_file, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=4)
 
     def trigger_pause(self, reason: str) -> datetime:
-        """Активує паузу на 24 години."""
+        """Activates a 24-hour pause."""
         now = datetime.now(UTC)
         resume_time = now + timedelta(hours=24)
 
@@ -59,7 +59,7 @@ class PauseManager:
         return resume_time
 
     def auto_resume(self) -> bool:
-        """Знімає паузу, якщо час вийшов."""
+        """Removes the pause if the time is up."""
         if not self._state.get("is_paused"):
             return False
 
@@ -77,14 +77,14 @@ class PauseManager:
         return False
 
     def is_paused(self) -> bool:
-        """Повертає True, якщо система на паузі. Включає ліниву перевірку авто-зняття."""
-        # Спочатку перевіряємо, чи не час зняти паузу
+        """Returns True if the system is paused. Includes lazy auto-resume check."""
+        # First, check if it's time to remove the pause
         if self.auto_resume():
             return False
         return self._state.get("is_paused", False)
 
     def get_remaining_pause_time(self) -> timedelta | None:
-        """Повертає залишковий час."""
+        """Returns the remaining pause time."""
         if not self.is_paused():
             return None
 
@@ -96,7 +96,7 @@ class PauseManager:
         return resume_at - datetime.now(UTC)
 
     def manual_resume(self) -> None:
-        """Примусове зняття паузи адміном."""
+        """Forced pause removal by admin."""
         self._state = self.default_state.copy()
         self._save_state(self._state)
         logger.info("Outreach manually resumed by admin before 24h.")

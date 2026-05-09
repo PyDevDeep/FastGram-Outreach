@@ -11,13 +11,13 @@ class LeadRepository:
         self.session = session
 
     async def get_pending_contacts(self, limit: int = 50) -> list[Lead]:
-        """Аналог get_pending_contacts з sheets_client"""
+        """Analog of get_pending_contacts from sheets_client"""
         stmt = select(Lead).where(Lead.status == "pending").limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def update_contact_status(self, lead_id: int, status: str, timestamp: str) -> bool:
-        """Аналог update_contact_status з sheets_client"""
+        """Analog of update_contact_status from sheets_client"""
         dt_timestamp = datetime.fromisoformat(timestamp)
         stmt = (
             update(Lead)
@@ -31,7 +31,7 @@ class LeadRepository:
         return True
 
     async def add_reply_data(self, user_id: str, reply_text: str, tag: str, timestamp: str) -> bool:
-        """Аналог add_reply_data з sheets_client"""
+        """Analog of add_reply_data from sheets_client"""
         dt_timestamp = datetime.fromisoformat(timestamp)
         stmt = (
             update(Lead)
@@ -47,7 +47,7 @@ class LeadRepository:
         result = await self.session.execute(stmt)
         await self.session.commit()
 
-        # Кастуємо результат до CursorResult для доступу до rowcount
+        # Cast result to CursorResult to access rowcount
         if isinstance(result, CursorResult):
             return result.rowcount > 0
         return False

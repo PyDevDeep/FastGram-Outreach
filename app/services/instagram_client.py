@@ -113,7 +113,7 @@ class NoFallbackProxyAdapter(HTTPAdapter):
 
 
 # ==========================================
-# MOCK MODE: АКТИВНО (24h COOLDOWN)
+# MOCK MODE: ACTIVE (24h COOLDOWN)
 # ==========================================
 class InstagramClient:
     def __init__(self, settings: Settings, client_factory: Callable[[], Client]) -> None:
@@ -151,9 +151,9 @@ class InstagramClient:
 
 
 # ==========================================
-# ORIGINAL CODE (ЗАКОМЕНТОВАНО)
-# Розкоментуй весь цей блок (Ctrl+/) після завершення 24-годинної паузи,
-# а блок MOCK MODE вище — закоментуй або видали.
+# ORIGINAL CODE (COMMENTED OUT)
+# Uncomment this entire block (Ctrl+/) after the 24-hour pause ends,
+# and comment out or delete the MOCK MODE block above.
 # ==========================================
 # class InstagramClient:
 #     def __init__(self, settings: Settings, client_factory: Callable[[], Client]) -> None:

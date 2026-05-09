@@ -52,7 +52,7 @@ async def get_logs(limit: int = 50) -> list[dict[str, Any]]:
         lines = lines[-limit:]
 
     logs: list[dict[str, Any]] = []
-    # Парсинг стандартного формату "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    # Parsing standard format "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     pattern = re.compile(r"^([\d\-]+\s[\d:,]+)\s-\s(\w+)\s-\s(\w+)\s-\s(.*)$")
 
     for i, line in enumerate(reversed(lines)):
