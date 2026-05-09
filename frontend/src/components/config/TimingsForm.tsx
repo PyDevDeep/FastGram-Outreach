@@ -17,12 +17,12 @@ export function TimingsForm({ config, onChange }: TimingsFormProps) {
   return (
     <div className="bg-card border border-border rounded-lg p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">
-        Паузи та Робочі години
+        Pauses and Work Hours
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Мін. затримка (с)
+            Min delay (s)
           </label>
           <input
             type="number"
@@ -36,7 +36,7 @@ export function TimingsForm({ config, onChange }: TimingsFormProps) {
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Макс. затримка (с)
+            Max delay (s)
           </label>
           <input
             type="number"
@@ -50,7 +50,7 @@ export function TimingsForm({ config, onChange }: TimingsFormProps) {
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Початок роботи (год)
+            Work start (h)
           </label>
           <input
             type="number"
@@ -65,7 +65,7 @@ export function TimingsForm({ config, onChange }: TimingsFormProps) {
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Кінець роботи (год)
+            Work end (h)
           </label>
           <input
             type="number"

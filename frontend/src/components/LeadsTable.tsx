@@ -56,7 +56,7 @@ export default function LeadsTable() {
   if (loading) {
     return (
       <div className="mt-8 text-gray-400 animate-pulse">
-        Завантаження таблиці...
+        Loading table...
       </div>
     );
   }
@@ -80,7 +80,7 @@ export default function LeadsTable() {
             {leads.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                  Немає даних для відображення
+                  No data to display
                 </td>
               </tr>
             ) : (

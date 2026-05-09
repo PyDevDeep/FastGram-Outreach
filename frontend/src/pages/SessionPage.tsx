@@ -20,9 +20,9 @@ export default function SessionPage() {
       setStatus(res.is_valid);
       setCreatedAt(res.session_created_at || null);
     } catch {
-      // Виправлено: видалено невикористану змінну error
+      // Fixed: removed unused error variable
       setStatus(false);
-      toast.error("Помилка перевірки сесії");
+      toast.error("Session check error");
     } finally {
       setIsLoading(false);
     }
@@ -38,20 +38,20 @@ export default function SessionPage() {
     try {
       const res = await triggerLogin(verificationCode || undefined);
       if (res.status === "success") {
-        toast.success("Сесія успішно створена!");
+        toast.success("Session successfully created!");
         setIsChallenge(false);
         setVerificationCode("");
         fetchStatus();
       } else if (res.status === "challenge_required") {
         setIsChallenge(true);
-        toast.error("Потрібен код 2FA");
+        toast.error("2FA code required");
       }
     } catch (error: unknown) {
-      // Виправлено: any замінено на безпечний unknown
+      // Fixed: any replaced with safe unknown
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
-        toast.error("Помилка авторизації");
+        toast.error("Authorization error");
       }
     } finally {
       setIsLoading(false);
@@ -59,23 +59,22 @@ export default function SessionPage() {
   };
 
   return (
-    <PageWrapper title="Управління сесією">
+    <PageWrapper title="Session Management">
       <div className="bg-card border border-border rounded-lg p-6 max-w-2xl">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-xl font-semibold mb-2">
-              Статус Instagram Сесії
+              Instagram Session Status
             </h2>
             <p className="text-muted-foreground text-sm">
-              Тут ви можете перевірити активність поточної сесії або ініціювати
-              нову.
+              Here you can check the status of the current session or initiate a new one.
             </p>
           </div>
           <Button onClick={fetchStatus} disabled={isLoading} variant="outline">
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
             />
-            Перевірити
+            Check
           </Button>
         </div>
 
@@ -91,26 +90,26 @@ export default function SessionPage() {
           <div>
             <div className="font-medium text-lg">
               {status === true
-                ? "Сесія Активна"
+                ? "Session Active"
                 : status === false
-                  ? "Сесія Невалідна"
-                  : "Перевірка..."}
+                  ? "Invalid Session"
+                  : "Checking..."}
             </div>
             {createdAt && status === true && (
               <div className="text-sm text-muted-foreground mt-1">
-                Створена: {formatDate(createdAt)}
+                Created: {formatDate(createdAt)}
               </div>
             )}
           </div>
         </div>
 
         <div className="border-t border-border pt-6">
-          <h3 className="font-medium mb-4">Створення нової сесії</h3>
+          <h3 className="font-medium mb-4">Create new session</h3>
 
           {isChallenge && (
             <div className="mb-4">
               <label className="block text-sm text-muted-foreground mb-2">
-                Код 2FA
+                2FA Code
               </label>
               <div className="relative">
                 <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -130,7 +129,7 @@ export default function SessionPage() {
             disabled={isLoading}
             className="w-full sm:w-auto"
           >
-            {isChallenge ? "Відправити код" : "Ініціювати логін"}
+            {isChallenge ? "Send code" : "Initiate login"}
           </Button>
         </div>
       </div>

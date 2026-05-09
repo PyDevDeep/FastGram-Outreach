@@ -5,7 +5,7 @@ import { ActivityLog } from "@/components/dashboard/ActivityLog";
 
 export default function DashboardPage() {
   return (
-    <PageWrapper title="Дашборд">
+    <PageWrapper title="Dashboard">
       <StatsRow />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">

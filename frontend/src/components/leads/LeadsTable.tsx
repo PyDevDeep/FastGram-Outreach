@@ -57,7 +57,7 @@ export function LeadsTable({
   }
 
   if (leads.length === 0) {
-    return <EmptyState message="Лідів не знайдено" />;
+    return <EmptyState message="No leads found" />;
   }
 
   return (

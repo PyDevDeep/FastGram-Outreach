@@ -8,7 +8,7 @@ export function useConfig() {
   return useQuery({
     queryKey: ["config"],
     queryFn: fetchConfig,
-    staleTime: 0, // Конфіг не кешується агресивно, завжди свіжий при відкритті сторінки
+    staleTime: 0, // Config is not aggressively cached, always fresh on page load
   });
 }
 
@@ -19,12 +19,12 @@ export function useSaveConfig() {
   return useMutation({
     mutationFn: (config: SystemConfig) => saveConfig(config),
     onSuccess: () => {
-      toast.success("Конфігурацію збережено");
+      toast.success("Configuration saved");
       queryClient.invalidateQueries({ queryKey: ["config"] });
       setConfigDirty(false);
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Помилка збереження конфігурації");
+      toast.error(error.message || "Error saving configuration");
     },
   });
 }

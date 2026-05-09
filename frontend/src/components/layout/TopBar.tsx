@@ -5,7 +5,7 @@ export function TopBar() {
         Outreach Dashboard
       </div>
       <div id="topbar-status-slot" className="flex items-center gap-4">
-        {/* Слот зарезервовано для індикаторів стану з Phase 3 */}
+        {/* Slot reserved for status indicators from Phase 3 */}
       </div>
     </header>
   );

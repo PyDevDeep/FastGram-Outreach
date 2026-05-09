@@ -11,7 +11,7 @@ export function Badge({ value }: BadgeProps) {
   const colorClass =
     STATUS_COLORS[value as LeadStatus] ||
     TAG_COLORS[value] ||
-    "bg-slate-500/10 text-slate-500 border-slate-500/20"; // нейтральний fallback
+    "bg-slate-500/10 text-slate-500 border-slate-500/20"; // neutral fallback
 
   return (
     <span

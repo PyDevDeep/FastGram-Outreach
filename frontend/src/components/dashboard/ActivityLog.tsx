@@ -8,7 +8,7 @@ export function ActivityLog() {
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden flex flex-col h-[400px]">
       <div className="p-5 border-b border-border font-semibold text-foreground">
-        Журнал подій
+        Activity Log
       </div>
 
       {isLogsLoading && !logs ? (
@@ -19,7 +19,7 @@ export function ActivityLog() {
         </div>
       ) : !logs || logs.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
-          <EmptyState message="Немає подій" />
+          <EmptyState message="No events" />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto relative">
@@ -27,13 +27,13 @@ export function ActivityLog() {
             <thead className="bg-card sticky top-0 shadow-sm z-10 border-b border-border">
               <tr>
                 <th className="px-5 py-3 font-medium text-muted-foreground">
-                  Час
+                  Time
                 </th>
                 <th className="px-5 py-3 font-medium text-muted-foreground">
-                  Подія
+                  Event
                 </th>
                 <th className="px-5 py-3 font-medium text-muted-foreground">
-                  Деталі
+                  Details
                 </th>
               </tr>
             </thead>

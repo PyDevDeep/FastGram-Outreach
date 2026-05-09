@@ -26,10 +26,10 @@ export default function ConfigPage() {
 
   if (isFetching) {
     return (
-      <PageWrapper title="Налаштування">
+      <PageWrapper title="Configuration">
         <div className="flex justify-center py-20">
           <div className="animate-pulse text-muted-foreground">
-            Завантаження конфігурації...
+            Loading configuration...
           </div>
         </div>
       </PageWrapper>
@@ -37,7 +37,7 @@ export default function ConfigPage() {
   }
 
   return (
-    <PageWrapper title="Налаштування">
+    <PageWrapper title="Configuration">
       <div className="flex flex-col gap-6 pb-20">
         <SpintaxEditor
           value={localConfig.message_template || ""}

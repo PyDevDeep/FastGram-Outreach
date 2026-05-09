@@ -21,12 +21,12 @@ export default function LeadsPage() {
     mutationFn: ({ id, status }: { id: number; status: LeadStatus }) =>
       updateLeadStatus(id, status),
     onSuccess: () => {
-      toast.success("Статус оновлено");
+      toast.success("Status updated");
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Помилка оновлення статусу");
+      toast.error(error.message || "Error updating status");
     },
   });
 
@@ -41,7 +41,7 @@ export default function LeadsPage() {
   const total = data?.total || 0;
 
   return (
-    <PageWrapper title="Управління лідами">
+    <PageWrapper title="Lead Management">
       <div className="flex justify-end mb-4">
         <SyncButton />
       </div>

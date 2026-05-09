@@ -10,15 +10,15 @@ export async function fetchLeads(
   limit: number,
   offset: number,
 ): Promise<PaginatedLeads> {
-  // FastAPI зараз повертає масив об'єктів замість пагінованої структури.
-  // Мапимо відповідь для відповідності інтерфейсу PaginatedLeads.
+  // FastAPI currently returns an array of objects instead of paginated structure.
+  // Map the response to match the PaginatedLeads interface.
   const items = await apiFetch<Lead[]>(
     `/api/leads/?limit=${limit}&offset=${offset}`,
   );
 
   return {
     items: Array.isArray(items) ? items : [],
-    total: 1000, // TODO: Замінити на реальне значення, коли FastAPI почне віддавати count
+    total: 1000, // TODO: Replace with real value when FastAPI starts returning count
     limit,
     offset,
   };

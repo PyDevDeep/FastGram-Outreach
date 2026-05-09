@@ -11,7 +11,7 @@ export function LiveStatusPanel() {
 
   return (
     <div className="bg-card border border-border rounded-lg p-6 flex flex-col gap-6 h-full">
-      <h2 className="text-lg font-semibold text-foreground">Статус Системи</h2>
+      <h2 className="text-lg font-semibold text-foreground">System Status</h2>
 
       {isStatusLoading && !status ? (
         <div className="flex flex-col gap-4">

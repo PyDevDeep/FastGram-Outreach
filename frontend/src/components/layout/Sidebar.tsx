@@ -8,14 +8,14 @@ export function Sidebar() {
   const navItems = [
     {
       path: "/",
-      label: "Дашборд",
+      label: "Dashboard",
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
-    { path: "/leads", label: "Ліди", icon: <Users className="w-5 h-5" /> },
-    { path: "/session", label: "Сесія", icon: <Key className="w-5 h-5" /> },
+    { path: "/leads", label: "Leads", icon: <Users className="w-5 h-5" /> },
+    { path: "/session", label: "Session", icon: <Key className="w-5 h-5" /> },
     {
       path: "/config",
-      label: "Налаштування",
+      label: "Configuration",
       icon: <Settings className="w-5 h-5" />,
     },
   ];

@@ -22,7 +22,7 @@ export function Pagination({
   return (
     <div className="flex items-center justify-between px-2 py-4 border-t border-border mt-4">
       <div className="text-sm text-muted-foreground">
-        Записи {start}–{end} з {total}
+        Records {start}–{end} of {total}
       </div>
       <div className="flex items-center gap-2">
         <Button
@@ -32,7 +32,7 @@ export function Pagination({
           disabled={offset === 0}
         >
           <ChevronLeft className="w-4 h-4 mr-1" />
-          Попередня
+          Previous
         </Button>
         <Button
           variant="outline"
@@ -40,7 +40,7 @@ export function Pagination({
           onClick={onNext}
           disabled={offset + limit >= total}
         >
-          Наступна
+          Next
           <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>

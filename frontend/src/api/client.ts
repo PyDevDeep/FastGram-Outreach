@@ -10,7 +10,7 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
 
-  // Запобігання генерації дубльованого /api/api/
+  // Prevent generation of duplicated /api/api/
   const url =
     BASE_URL.endsWith("/api") && cleanPath.startsWith("/api")
       ? `${BASE_URL}${cleanPath.slice(4)}`
@@ -40,7 +40,7 @@ export async function apiFetch<T>(
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  // Якщо відповідь порожня (наприклад, 204 No Content), повертаємо порожній об'єкт
+  // If response is empty (e.g. 204 No Content), return empty object
   const text = await response.text();
   return text ? JSON.parse(text) : ({} as T);
 }

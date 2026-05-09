@@ -17,12 +17,12 @@ export function LimitsForm({ config, onChange }: LimitsFormProps) {
   return (
     <div className="bg-card border border-border rounded-lg p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">
-        Ліміти та Прогрів
+        Limits and Warmup
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Макс. на день
+            Max per day
           </label>
           <input
             type="number"
@@ -36,7 +36,7 @@ export function LimitsForm({ config, onChange }: LimitsFormProps) {
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Початковий ліміт (Warmup)
+            Initial limit (Warmup)
           </label>
           <input
             type="number"
@@ -50,7 +50,7 @@ export function LimitsForm({ config, onChange }: LimitsFormProps) {
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Крок збільшення (Warmup)
+            Increase step (Warmup)
           </label>
           <input
             type="number"

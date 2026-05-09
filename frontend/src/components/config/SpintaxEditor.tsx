@@ -16,17 +16,16 @@ export function SpintaxEditor({ value, onChange }: SpintaxEditorProps) {
   return (
     <div className="bg-card border border-border rounded-lg p-6">
       <h2 className="text-lg font-semibold text-foreground mb-4">
-        Шаблон повідомлення (Spintax)
+        Message Template (Spintax)
       </h2>
       <textarea
         value={value}
         onChange={handleChange}
-        placeholder="Введіть spintax-шаблон, наприклад: {Привіт|Вітаю}, {як справи?|як успіхи?}"
+        placeholder="Enter spintax template, e.g.: {Hello|Hi}, {how are you?|how is it going?}"
         className="w-full h-40 bg-background border border-border text-foreground rounded-md p-3 focus:ring-2 focus:ring-ring focus:outline-none resize-y"
       />
       <p className="text-sm text-muted-foreground mt-2">
-        Використовуйте фігурні дужки та вертикальну риску для варіативності
-        тексту.
+        Use curly braces and vertical pipes for text variation.
       </p>
     </div>
   );
