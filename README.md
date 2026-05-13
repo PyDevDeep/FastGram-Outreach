@@ -1,7 +1,7 @@
 # FastGram — Instagram Outreach Automation MVP 🚀
 
 > A self-hosted, safety-first Instagram DM outreach pipeline built with FastAPI and n8n.
-> Sends personalized cold DMs, tracks replies, classifies leads, and protects accounts
+> Manages user interactions, tracks replies, classifies leads, and protects accounts
 > through gradient warm-up, proxy rotation, and automatic pause/resume logic.
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue?logo=python)
